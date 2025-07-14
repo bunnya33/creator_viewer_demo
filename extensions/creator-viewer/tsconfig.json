@@ -1,0 +1,10 @@
+{
+    "extends": "./base.tsconfig.json",
+    "compilerOptions": {
+        "outDir": "./dist",
+        "rootDir": "./source",
+        "types": ["node", "@cocos/creator-types/editor"],
+        "strict": false
+    },
+    "include": ["source/**/*", "global.d.ts"]
+}
