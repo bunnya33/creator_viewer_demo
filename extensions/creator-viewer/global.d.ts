@@ -66,4 +66,6 @@ declare global {
             enumValue: string | number;
         }
     }
+
+    type ClientSender = (data : S2C_CreatorViewerMessage)=>void;
 }

@@ -3,7 +3,7 @@ import { ElButton, ElCheckbox, ElNotification, ElText, ElTree, TabsPaneContext, 
 import { onMounted, provide, ref } from 'vue';
 import ElCssLoader from './../../ElCSSLoader';
 import ViewerPropCollapse from './components/property/ViewerPropCollapse.vue';
-import { nodeTreeData, refreshNodeActiveStatus, treeRef } from './CreatorViewerMiddleware';
+import { ClientBridge, nodeTreeData, refreshNodeActiveStatus, treeRef } from './CreatorViewerMiddleware';
 import { startListener } from './WSHandler';
 import { AddressInfo } from 'ws';
 
@@ -34,13 +34,9 @@ const handleNodeClick = (data) => {
     console.log(data);
 }
 
-const handleCheckChange = (data: INodeInfo, checked: boolean, childrenHasChecked: boolean) => {
-    console.log(`on checked`, data.active, data.activeInHierarchy);
-    refreshNodeActiveStatus(data, data.parentActive);
-}
-
 const onHandleNodeCheckedChange = (checked: any, data: INodeInfo) => {
     console.log(`on checked`, checked, data);
+    ClientBridge.onNodeActiveChange(data.uuid, checked);
     refreshNodeActiveStatus(data, data.parentActive);
 }
 
@@ -123,15 +119,15 @@ window['propTestData'] = comps;
                             :show-checkbox="false" :check-strictly="true" :indent="18" :highlight-current="true"
                             :defaultExpandAll="false" :check-on-click-node="false" :check-on-click-leaf="false"
                             :auto-expand-parent="false" :draggable="true" node-key="uuid" @node-click="handleNodeClick"
-                            @check-change="handleCheckChange" :allow-drop="allowDropCheck" :allowDrag="allowDragCheck"
+                            :allow-drop="allowDropCheck" :allowDrag="allowDragCheck"
                             @node-expand="onHandleNodeExpand" @node-collapse="onHandleNodeCollapse"
                             :default-expanded-keys="expandNodes">
 
                             <template #default="{ node, data }">
-                                <ElCheckbox v-model="data.activeInHierarchy" @click.stop
+                                <ElCheckbox v-model="data.active" @click.stop
                                     @change="onHandleNodeCheckedChange($event, data)"
-                                    :class="data.active ? 'checkbox-active' : 'checkbox-inactive'" />
-                                <span :style="{ color: !data.active ? 'gray' : 'white' }">
+                                    :class="data.activeInHierarchy ? 'checkbox-active' : 'checkbox-inactive'" />
+                                <span :style="{ color: !data.activeInHierarchy ? 'gray' : 'white' }">
                                     {{ node.label }}
                                 </span>
                             </template>
