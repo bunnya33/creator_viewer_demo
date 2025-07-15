@@ -6,5 +6,5 @@
         "types": ["node", "@cocos/creator-types/editor"],
         "strict": false
     },
-    "include": ["source/**/*", "global.d.ts"]
+    "include": ["source/**/*", "global.d.ts", "../../global.d.ts"]
 }

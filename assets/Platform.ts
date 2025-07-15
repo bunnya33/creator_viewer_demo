@@ -3,23 +3,21 @@ const { ccclass, property } = _decorator;
 
 @ccclass('Platform')
 export class Platform extends Component {
-    start() {
-
-    }
-
-    update(deltaTime: number) {
-
-    }
+    @property(Node)
+    protected selectedNode : Node;
 
     onClickSendScene() {
-        const ws = new WebSocket("ws://localhost:8999");
-        ws.onopen = () => {
-            console.log(`on websocket connect`);
-            ws.send(JSON.stringify({
-                data: [globalInfo.sceneTree],
-                type: "scene"
-            }));
-        }
+        globalInfo.bridge.connect();
+    }
+
+    onClickDelete() {
+        this.selectedNode.destroy();
+    }
+
+    onClickEditParent() {
+        const node = this.node.getChildByName("PageView");
+        node.active= !node.active;
+        // node.setSiblingIndex(Math.floor(Math.random() * 9));
     }
 }
 

@@ -63,7 +63,25 @@ interface IPropCopy {
     hasSetter : boolean;
 }
 
-class ViewBridgeBase {
+export class ViewBridgeBase {
+
+    protected _websocket : WebSocket;
+
+    connect() {
+        this._websocket = new WebSocket("ws://localhost:33000");
+        this._websocket.onopen = this.onConnected.bind(this);
+    }
+
+    protected onConnected() {
+        console.log(`on websocket connect 建立连接，发送节点树数据`);
+        //@ts-ignore
+        this.sendData({data: [globalInfo.sceneTree],type: "scene"});
+    }
+
+    protected sendData(viewerData : CreatorViewerMessage) {
+        this._websocket?.send(JSON.stringify(viewerData));
+    }
+
     selectNodeByUUid(uuid : string) {
         const node = globalInfo.allNodeInfosMap.get(uuid);
         if(!node) {
@@ -80,12 +98,24 @@ class ViewBridgeBase {
         console.log(JSON.stringify(serializeDatas));
     }
 
-    onClientConnect() {
-        console.log(JSON.stringify(globalInfo.sceneTree));
+    onNodeDestroyed(uuid : string) {
+        this.sendData({data: uuid,type: "node_destroyed"});
+    }
+
+    onNodeActiveInHierarchyChanged(uuid : string, activeInHierarchy : boolean) {
+        this.sendData({data: { nodeUuid : uuid, activeInHierarchy : activeInHierarchy},type: 'node_active_in_hierarchy_change'});
+    }
+
+    onChildRemove(uuid : string) {
+        
+    }
+
+    onChildrenOrderChange(uuid : string, childrenOrder : Record<string, number>) {
+        this.sendData({data: { nodeUuid : uuid, childrenOrder : childrenOrder},type: 'children_order_change'});
     }
 }
 
-class GlobalInfo {
+export class GlobalInfo {
     sceneTree: NodeInfo;
     trackers : Map<string, ViewElementTracker> = new Map();
     allNodesMap: Map<string, Node> = new Map();
@@ -234,6 +264,7 @@ function getCCObjectClassEnum(target : CCObjectConstructor, propKey : string) {
         }
     }
 }
+
 
 /** ElementTracker */
 class ViewElementTracker {
@@ -586,7 +617,8 @@ class NodeInfo {
     name: string = "";
     uuid: string = "";
     children: NodeInfo[] = [];
-    active : boolean = false;
+    activeInHierarchy : boolean = false;
+
     @NonEnumerable()
     childrenUUidMap: Map<string, NodeInfo> = new Map();
 
@@ -605,7 +637,7 @@ class NodeInfo {
         node.on(Node.EventType.CHILDREN_ORDER_CHANGED, this.onChildrenOrderChange, this);
         node.on(Node.EventType.COMPONENT_ADDED, this.onComponentAdd, this);
         node.on(Node.EventType.NODE_DESTROYED, this.onNodeDestroyed, this);
-        node.on(Node.EventType.ACTIVE_CHANGED, this.onNodeActiveChanged, this);
+        node.on(Node.EventType.ACTIVE_IN_HIERARCHY_CHANGED, this.onActiveInHierarchyChanged, this);
         globalInfo.allNodeInfosMap.set(node.uuid, this);
     }
 
@@ -613,12 +645,14 @@ class NodeInfo {
 
     }
 
-    protected onNodeActiveChanged(node : Node, active : boolean) {
-        this.active = active;
+    protected onActiveInHierarchyChanged(node : Node, active : boolean) {
+        this.activeInHierarchy = node.activeInHierarchy;
+        globalInfo.bridge.onNodeActiveInHierarchyChanged(this.uuid, node.activeInHierarchy);
     }
 
     protected onNodeDestroyed() {
         console.log(`on node ${this.name} destroyed`);
+        globalInfo.bridge.onNodeDestroyed(this.uuid);
         globalInfo.allNodeInfosMap.delete(this.uuid);
     }
 
@@ -650,13 +684,19 @@ class NodeInfo {
     onChildrenOrderChange() {
         Logger.log(`on children order change`);
         const selfNode = globalInfo.allNodesMap.get(this.uuid);
+
+        const childrenOrder : Record<string, number> = {};
         selfNode?.children.forEach(node => {
             if (this.childrenUUidMap.has(node.uuid)) {
                 this.childrenUUidMap.get(node.uuid).siblingIndex = node.getSiblingIndex();
             }
+            childrenOrder[node.uuid] = node.getSiblingIndex();
         })
 
         this.children.sort((a, b) => a.siblingIndex - b.siblingIndex);
+
+        
+        globalInfo.bridge.onChildrenOrderChange(this.uuid, childrenOrder);
     }
 
     onNodeNameChange(newName: string) {
@@ -715,7 +755,7 @@ function walkNode(node: Node, parent?: NodeInfo) {
     nodeInfo.name = node.name;
     nodeInfo.uuid = node.uuid;
     nodeInfo.parent = parent;
-    nodeInfo.active = node.active;
+    nodeInfo.activeInHierarchy = node.activeInHierarchy;
     globalInfo.allNodesMap.set(node.uuid, node);
     node.children.forEach(child => nodeInfo.addChildNodeInfo(walkNode(child, nodeInfo)));
     return nodeInfo;

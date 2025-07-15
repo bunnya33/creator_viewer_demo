@@ -1,69 +1,25 @@
 <script setup lang="ts">
-import { ElCheckbox, ElNotification, ElText, ElTree, TabsPaneContext, TreeInstance } from 'element-plus';
+import { ElButton, ElCheckbox, ElNotification, ElText, ElTree, TabsPaneContext, TreeInstance } from 'element-plus';
 import { onMounted, provide, ref } from 'vue';
 import ElCssLoader from './../../ElCSSLoader';
 import ViewerPropCollapse from './components/property/ViewerPropCollapse.vue';
-import { WebSocketServer, WebSocket, AddressInfo } from 'ws';
+import { nodeTreeData, refreshNodeActiveStatus, treeRef } from './CreatorViewerMiddleware';
+import { startListener } from './WSHandler';
+import { AddressInfo } from 'ws';
 
-const LISTEN_PORT = 33000;
-
-async function tryStartListenServer(startPort: number, maxCheckPorts: number = startPort + 1000) {
-    for (let port = startPort; port < maxCheckPorts; port++) {
-        try {
-            const wss = new WebSocket.Server({ port: port });
-            await new Promise<void>((resolve, reject) => {
-                wss.once('error', (err) => {
-                    if ((err as any).code === 'EADDRINUSE') {
-                        console.error(`❌ 端口 ${port} 被占用了，尝试其它端口`);
-                        
-                    } else {
-                        console.error('❌ WebSocket 服务器错误：', err);
-                    }
-                    reject();
-                })
-                wss.once('listening', ()=>{
-                    console.log(`on listening ${port}`);
-                    resolve();
-                })
-            })
-
-            return wss;
-        } catch (error) {
-            console.log(error);
-        }
-    }
-}
 
 const root = ref<HTMLElement>();
-const treeRef = ref<TreeInstance>();
+const expandNodes = ref<string[]>([]);
+
 const listeningPort = ref("等待监听端口...");
 onMounted(async () => {
     ElCssLoader(root.value);
-    // const wss = new WebSocket.Server({ port: LISTEN_PORT });
-    // wss.on('connection', function connection(incomingClient) {
-    //     console.log(`on client connected`);
-    //     incomingClient.on('message', function (message) {
-    //         const msObj = JSON.parse(message.toString()) as CreatorViewerMessage;
-    //         console.log(msObj);
 
-    //         if (msObj.type == "scene") {
-    //             testNodeData.value.length = 0;
-    //             refreshNodeActiveInHierarchy(msObj.data[0], msObj.data[0].active);
-    //             testNodeData.value.push(msObj.data[0]);
-    //             // treeRef.value.append(msObj.data,treeRef.value.root);
-    //         }
-    //         console.log(`in coming message`, message.toString());
-    //     })
-    // })
-
-    const wss = await tryStartListenServer(LISTEN_PORT);
+    const wss = await startListener();
     listeningPort.value = `已经开启监听端口${(wss.address() as AddressInfo).port}`;
-
-    setTimeout(async ()=>{
-    const wss = await tryStartListenServer(LISTEN_PORT);
-    listeningPort.value = `已经开启监听端口${(wss.address() as AddressInfo).port}`;
-    }, 2000)
 })
+
+
 function handleClick(pane: TabsPaneContext, event) {
     // console.log(args);
     ElNotification({
@@ -73,23 +29,19 @@ function handleClick(pane: TabsPaneContext, event) {
     })
 }
 
-interface Tree {
-    label: string
-    children?: Tree[]
-}
 
-const handleNodeClick = (data: Tree) => {
-    console.log(data)
+const handleNodeClick = (data) => {
+    console.log(data);
 }
 
 const handleCheckChange = (data: INodeInfo, checked: boolean, childrenHasChecked: boolean) => {
     console.log(`on checked`, data.active, data.activeInHierarchy);
-    refreshNodeActiveInHierarchy(data, data.parentActive);
+    refreshNodeActiveStatus(data, data.parentActive);
 }
 
 const onHandleNodeCheckedChange = (checked: any, data: INodeInfo) => {
     console.log(`on checked`, checked, data);
-    refreshNodeActiveInHierarchy(data, data.parentActive);
+    refreshNodeActiveStatus(data, data.parentActive);
 }
 
 function allowDropCheck(draggingNode, dropNode, type): boolean {
@@ -102,38 +54,33 @@ function allowDragCheck(draggingNode): boolean {
     return true;
 }
 
+function onHandleNodeExpand(nodeInfo: INodeInfo) {
+    console.log(`on node expand change`, nodeInfo);
+    expandNodes.value.push(nodeInfo.uuid);
+}
 
-const testNodeData = ref<INodeInfo[]>([]);
+function onHandleNodeCollapse(nodeInfo: INodeInfo) {
+    console.log(`on node collapse change`, nodeInfo);
+    const index = expandNodes.value.indexOf(nodeInfo.uuid);
+    index != -1 && expandNodes.value.splice(index, 1);
+}
 
-// refreshNodeActiveInHierarchy(testNodeData.value[0], testNodeData.value[0].active);
+function onClickEditTest() {
+    console.log(treeRef.value.getNode('34kE1xIB1Ha6xHkJ6Y/vyU'));
+    const data = JSON.stringify(treeRef.value.getNode('34kE1xIB1Ha6xHkJ6Y/vyU').data);
+    treeRef.value.remove(treeRef.value.getNode('34kE1xIB1Ha6xHkJ6Y/vyU'));
 
-// setTimeout(()=>{
-//     testNodeData[0].children.splice(0, 1,        {
-//         "name": "platform1111",
-//         "uuid": "sdfsdfsdf",
-//         "children": [
-//         ],
-//         "active": true,
-//         "siblingIndex": 0
-//     })
+    setTimeout(() => {
+        nodeTreeData.value[0].children[0].children[3].children.push(JSON.parse(data));
+        // treeRef.value.getNode('34KMJzUedL24Z4JBfJ1D8R').childNodes.push()
+    }, 2000);
+}
 
-//     console.log(treeRef.value.getNode("40cfYTENlFPbFWHv/sgudx"));
-//     treeRef.value.getNode("40cfYTENlFPbFWHv/sgudx").parent.data.children.splice(0, 0,        {
-//         "name": "platform1111",
-//         "uuid": "sdfsdfsdf",
-//         "activeInHierarchy" : true,
-//         "children": [
-//         ],
-//         "active": true,
-//         "siblingIndex": 0
-//     })
-// }, 5000)
-
-function refreshNodeActiveInHierarchy(node: INodeInfo, parentActive: boolean) {
-    node.parentActive = parentActive;
-    node.activeInHierarchy = node.active && parentActive;
-    node.children.forEach(child => {
-        refreshNodeActiveInHierarchy(child, node.activeInHierarchy);
+function onClickExpandAll() {
+    expandNodes.value.length = 0;
+    treeRef.value?.store._getAllNodes().forEach((node) => {
+        if(!expandNodes.value.includes(node.data.uuid)) expandNodes.value.push(node.data.uuid);
+        node.expand();
     })
 }
 
@@ -165,22 +112,26 @@ window['propTestData'] = comps;
 
 <template style="height: 100%;">
     <div style="height: 100%; box-shadow: var(--el-border-color-light) 0px 0px 10px">
-        <ElText>{{listeningPort}}</ElText>
+        <ElText>{{ listeningPort }}</ElText>
+        <ElButton @click="onClickEditTest">测试节点默认展开</ElButton>
+        <ElButton @click="onClickExpandAll">展开所有</ElButton>
         <el-splitter layout="vertical">
             <el-splitter-panel>
                 <div class="demo-panel">
                     <div ref="root">
-                        <ElTree ref="treeRef" style="width: 100%;" :data="testNodeData" :props="defaultProps"
+                        <ElTree ref="treeRef" style="width: 100%;" :data="nodeTreeData" :props="defaultProps"
                             :show-checkbox="false" :check-strictly="true" :indent="18" :highlight-current="true"
-                            :defaultExpandAll="true" :check-on-click-node="false" :check-on-click-leaf="false"
-                            :draggable="true" node-key="uuid" @node-click="handleNodeClick"
-                            @check-change="handleCheckChange" :allow-drop="allowDropCheck" :allowDrag="allowDragCheck">
+                            :defaultExpandAll="false" :check-on-click-node="false" :check-on-click-leaf="false"
+                            :auto-expand-parent="false" :draggable="true" node-key="uuid" @node-click="handleNodeClick"
+                            @check-change="handleCheckChange" :allow-drop="allowDropCheck" :allowDrag="allowDragCheck"
+                            @node-expand="onHandleNodeExpand" @node-collapse="onHandleNodeCollapse"
+                            :default-expanded-keys="expandNodes">
 
                             <template #default="{ node, data }">
-                                <ElCheckbox v-model="data.active" @click.stop
+                                <ElCheckbox v-model="data.activeInHierarchy" @click.stop
                                     @change="onHandleNodeCheckedChange($event, data)"
-                                    :class="data.activeInHierarchy ? 'checkbox-active' : 'checkbox-inactive'" />
-                                <span :style="{ color: !data.activeInHierarchy ? 'gray' : 'white' }">
+                                    :class="data.active ? 'checkbox-active' : 'checkbox-inactive'" />
+                                <span :style="{ color: !data.active ? 'gray' : 'white' }">
                                     {{ node.label }}
                                 </span>
                             </template>

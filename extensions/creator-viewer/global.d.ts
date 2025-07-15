@@ -9,27 +9,6 @@ interface EnumItem {
 }
 
 declare global {
-
-
-    /** 节点信息结构 */
-    interface INodeInfo {
-        /** 节点名称 */
-        name: string;
-        /** uuid */
-        uuid: string;
-        /** 子节点 */
-        children: INodeInfo[];
-        /** 是否激活 */
-        active: boolean;
-        /** 节点顺序索引 */
-        siblingIndex: number;
-        /** 当前在节点树种是否激活 */
-        activeInHierarchy?: boolean;
-        /** 父节点是否是激活状态 */
-        parentActive?: boolean;
-    }
-
-
     interface ICCObjectProp {
         /** 属性名称 */
         key: string;
@@ -87,14 +66,4 @@ declare global {
             enumValue: string | number;
         }
     }
-
-
-    ///////////////////////////////////////////////////////////////// Websocket Message Define
-        /** 场景节点信息 */
-        type ISceneData = INodeInfo[];
-
-        /** Creator Viewer 消息定义 */
-        type CreatorViewerMessage =
-        | { type: 'scene'; data: ISceneData }
-        | { type: 'node_remove'; data: INodeInfo };
 }
