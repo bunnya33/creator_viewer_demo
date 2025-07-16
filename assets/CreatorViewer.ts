@@ -535,12 +535,6 @@ class ViewElementTracker {
             uuid: this._uuid,
             props: propsArray,
         };
-        // return JSON.stringify({
-        //     type : this._type,
-        //     name : this._name,
-        //     uuid : this._uuid,
-        //     props : propsArray,
-        // });
     }
 
     getType() {
@@ -667,6 +661,7 @@ class ViewElementTracker {
 
 @vclass()
 class NodeInfo {
+    static index : number = 0;
     name: string = "";
     uuid: string = "";
     children: NodeInfo[] = [];
@@ -682,6 +677,10 @@ class NodeInfo {
     @NonEnumerable()
     parent: NodeInfo;
 
+    @NonEnumerable()
+    protected _index: number = NodeInfo.index++;
+
+    @NonEnumerable()
     siblingIndex: number = 0;
 
     constructor(node: Node) {
@@ -691,10 +690,15 @@ class NodeInfo {
         node.on(Node.EventType.CHILDREN_ORDER_CHANGED, this.onChildrenOrderChange, this);
         node.on(Node.EventType.COMPONENT_ADDED, this.onComponentAdd, this);
         node.on(Node.EventType.NODE_DESTROYED, this.onNodeDestroyed, this);
-        // node.on(Node.EventType.ACTIVE_IN_HIERARCHY_CHANGED, this.onActiveInHierarchyChanged, this);
         node.on(Node.EventType.ACTIVE_CHANGED, this.onActiveChanged, this);
         globalInfo.allNodeInfosMap.set(node.uuid, this);
         globalInfo.allNodesMap.set(node.uuid, node);
+    }
+
+    clearListeners() {
+        const node = globalInfo.allNodesMap.get(this.uuid);
+        if(!isValid(node)) return;
+        node.targetOff(this);
     }
 
     protected onComponentAdd(component: Component) {
@@ -706,11 +710,6 @@ class NodeInfo {
         this.active = node.active;
         globalInfo.bridge.onNodeActiveChanged(this.uuid, node.active);
     }
-
-    // protected onActiveInHierarchyChanged(node : Node, active : boolean) {
-    //     this.activeInHierarchy = node.activeInHierarchy;
-    //     globalInfo.bridge.onNodeActiveInHierarchyChanged(this.uuid, node.activeInHierarchy);
-    // }
 
     protected onNodeDestroyed() {
         console.log(`on node ${this.name} destroyed`);
@@ -743,8 +742,8 @@ class NodeInfo {
     }
 
     protected onChildAdd(child: Node) {
-        console.log(new Error().stack);
-        Logger.log(`on child add ${child.uuid}`, this);
+        // console.log(new Error().stack);
+        Logger.log(`on child add ${child.uuid}    index : ${ this._index}`, this);
         const childInfo = globalInfo.allNodeInfosMap.get(child.uuid) || walkNode(child, this);
         this.addChildNodeInfo(childInfo);
 
@@ -865,7 +864,17 @@ if (!EDITOR_NOT_IN_PREVIEW) {
 
     patchNode();
 
+    director.on(Director.EVENT_BEFORE_SCENE_LOADING, (scene: Scene) => {
+        globalInfo.allNodeInfosMap.forEach(nodeInfo=>nodeInfo.clearListeners());
+        globalInfo.allNodesMap.clear();
+        globalInfo.allNodeInfosMap.clear();
+        globalInfo.trackers.forEach(tracker=>tracker.unTrack());
+        globalInfo.selectedNode = undefined;
+        // Logger.log(JSON.stringify(globalInfo.sceneTree, undefined, 2));
+    })
+
     director.on(Director.EVENT_AFTER_SCENE_LAUNCH, (scene: Scene) => {
+        globalInfo.allNodeInfosMap.forEach(nodeInfo=>nodeInfo.clearListeners());
         globalInfo.allNodesMap.clear();
         globalInfo.allNodeInfosMap.clear();
         globalInfo.sceneTree = walkNode(scene);

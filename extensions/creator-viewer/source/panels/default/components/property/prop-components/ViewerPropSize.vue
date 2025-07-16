@@ -25,18 +25,24 @@ watch(
     <ElRow :gutter="10">
         <ElCol :span="12">
             <div class="vec-field">
-                <ElText size="small">width</ElText>
-                <ElInputNumber size="small" controls-position="right" v-model="internalValue.width"></ElInputNumber>
+                <ElInputNumber size="small" controls-position="right" v-model="internalValue.width">
+                    <template #prefix>
+                        <span>W</span>
+                    </template>
+                </ElInputNumber>
             </div>
         </ElCol>
         <ElCol :span="12">
             <div class="vec-field">
-                <ElText size="small">height</ElText>
-                <ElInputNumber size="small" controls-position="right" v-model="internalValue.width"></ElInputNumber>
+                <ElInputNumber size="small" controls-position="right" v-model="internalValue.height">
+                    <template #prefix>
+                        <span>H</span>
+                    </template>
+                </ElInputNumber>
                 <!-- <CoordinateNumInput v-model="internalValue.height" color="#67a900"></CoordinateNumInput> -->
             </div>
         </ElCol>
-    
+
     </ElRow>
 </template>
 
@@ -53,31 +59,33 @@ watch(
     min-width: 0;
     width: 100%;
 }
-.vec-field .el-input-number .el-input-number__increase  {
+
+.vec-field .el-input-number .el-input-number__increase {
     width: 16px;
 }
 
-.vec-field .el-input-number .el-input-number__decrease  {
+.vec-field .el-input-number .el-input-number__decrease {
     width: 16px;
 }
 
 /* 外部容器用于布局 */
 .color-bar-wrapper {
-  position: relative;
-  display: inline-block;
+    position: relative;
+    display: inline-block;
 }
 
 /* 竖线条 */
 .color-bar {
-  position: absolute;
-  top: 6px;
-  bottom: 6px;
-  left: 5px;
-  width: 4px;
-  background-color: #f56c6c; /* 只有这条竖线有颜色 */
-  border-radius: 4px;
-  z-index: 2;
-  pointer-events: none; /* 让它不影响点击 */
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    left: 5px;
+    width: 4px;
+    background-color: #f56c6c;
+    /* 只有这条竖线有颜色 */
+    border-radius: 4px;
+    z-index: 2;
+    pointer-events: none;
+    /* 让它不影响点击 */
 }
-
 </style>

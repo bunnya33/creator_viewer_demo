@@ -66,10 +66,12 @@ async function tryStartListenServer(startPort: number, maxCheckPorts: number = s
                 })
 
                 incomingClient.on('error', ()=>{
+                    cvMiddleward.onClientDisconnect();
                     clientSocket = undefined;
                 })
 
                 incomingClient.on('close', ()=>{
+                    cvMiddleward.onClientDisconnect();
                     clientSocket = undefined;
                 })
 

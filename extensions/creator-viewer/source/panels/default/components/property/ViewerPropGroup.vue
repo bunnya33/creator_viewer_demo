@@ -2,7 +2,7 @@
     <ElCollapseItem :title="props.propData.type == 'node' ? 'Node' : props.propData.name">
         <template #title="{ isActive }">
           <div :class="['title-wrapper', { 'is-active': isActive }]">
-            <ElCheckbox @click.stop class="test" :checked="isChecked"></ElCheckbox>
+            <ElCheckbox @click.stop class="test" v-model="checkboxModel" @change="onCheckChange"></ElCheckbox>
             {{ props.propData.type == 'node' ? 'Node' : props.propData.name }}
             <ElIcon size="large" style="right: 5px; position: absolute; top: 13px;bottom: 3px;">
               <component :is="iconMap[props.propData.type]"></component>
@@ -20,7 +20,7 @@
 <script setup lang="ts">
 import { Document, Menu } from '@element-plus/icons-vue';
 import { ElCheckbox, ElCollapseItem, ElIcon } from 'element-plus';
-import { inject, provide, ref } from 'vue';
+import { computed, inject, provide, ref } from 'vue';
 import ViewerPropBase from './prop-components/ViewerPropBase.vue';
 import ViewerPropBoolean from './prop-components/ViewerPropBoolean.vue';
 import ViewerPropColor from './prop-components/ViewerPropColor.vue';
@@ -31,10 +31,38 @@ import ViewerPropVec2 from './prop-components/ViewerPropVec2.vue';
 import ViewerPropVec3 from './prop-components/ViewerPropVec3.vue';
 import ViewerPropVec4 from './prop-components/ViewerPropVec4.vue';
 import ViewerPropSize from './prop-components/ViewerPropSize.vue';
+import { ClientBridge, isTrackedNodeActive } from '../../CreatorViewerMiddleware';
 
 const props = defineProps<{propData : ICCObjectPropGroup}>();
 
 const isChecked = ref(false);
+
+const checkboxModel = computed({
+  get() {
+    return props.propData.type === 'node' ? isTrackedNodeActive.value : isChecked.value;
+  },
+  set(val: boolean) {
+    if (props.propData.type === 'node') {
+      isTrackedNodeActive.value = val;
+    } else {
+      isChecked.value = val;
+    }
+  }
+});
+
+function onCheckChange(value : boolean) {
+    if(props.propData.type == "node") {
+        ClientBridge.onNodeActiveChange(props.propData.uuid, value);
+    }
+    else {
+        for(const prop of props.propData.props) {
+            if(prop.key == "_enabled") {
+                isChecked.value = prop.value;
+                break;
+            }
+        }
+    }
+}
 
 isChecked.value = false;
 function refreshCheckedStatus() {

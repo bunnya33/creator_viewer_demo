@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ElButton, ElCheckbox, ElNotification, ElText, ElTree, TabsPaneContext, TreeInstance, TreeNode } from 'element-plus';
-import { nextTick, onMounted, provide, ref } from 'vue';
+import { ElButton, ElCheckbox, ElInput, ElNotification, ElText, ElTree, FilterNodeMethodFunction, TabsPaneContext, TreeInstance, TreeNode } from 'element-plus';
+import { nextTick, onMounted, provide, ref, watch } from 'vue';
 import ElCssLoader from './../../ElCSSLoader';
 import ViewerPropCollapse from './components/property/ViewerPropCollapse.vue';
 import { ClientBridge, nodeTreeData, trackPropGroupDatas, refreshNodeActiveStatus, treeRef } from './CreatorViewerMiddleware';
 import { startListener } from './WSHandler';
 import { AddressInfo } from 'ws';
+import { Filter } from '@element-plus/icons-vue';
 
 
 const root = ref<HTMLElement>();
@@ -86,6 +87,23 @@ function onClickShowData() {
     console.log(`nodeTreeData `, nodeTreeData);
 }
 
+
+interface Tree {
+  [key: string]: any
+}
+
+const filterText = ref('')
+
+watch(filterText, (val) => {
+  treeRef.value!.filter(val)
+})
+
+const filterNode: FilterNodeMethodFunction = (value: string, data: Tree) => {
+  if (!value) return true
+  console.log(data);
+  return data.name.includes(value)
+}
+
 const defaultProps = {
     children: 'children',
     label: 'name',
@@ -117,6 +135,7 @@ window['propTestData'] = comps;
         <ElText>{{ listeningPort }}</ElText>
         <ElButton @click="onClickExpandAll">展开所有</ElButton>
         <ElButton @click="onClickShowData">显示数据</ElButton>
+        <ElInput :prefix-icon="Filter" v-model="filterText" class="w-60 mb-2" placeholder="输入节点名称" />
         <el-splitter layout="vertical">
             <el-splitter-panel>
                 <div class="demo-panel">
@@ -127,7 +146,7 @@ window['propTestData'] = comps;
                             :auto-expand-parent="false" :draggable="true" node-key="uuid" @node-click="handleNodeClick"
                             :allow-drop="allowDropCheck" :allowDrag="allowDragCheck"
                             @node-expand="onHandleNodeExpand" @node-collapse="onHandleNodeCollapse" @node-drop="onHandleNodeDrop"
-                            :default-expanded-keys="expandNodes">
+                            :default-expanded-keys="expandNodes" :filter-node-method="filterNode">
 
                             <template #default="{ node, data }">
                                 <ElCheckbox v-model="data.active" @click.stop

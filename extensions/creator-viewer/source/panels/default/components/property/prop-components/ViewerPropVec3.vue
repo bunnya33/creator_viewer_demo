@@ -39,16 +39,13 @@ watch(
     { deep: true }
 )
 
-function onValueChange(...args) {
-    console.log(`on value change `, args);
-}
 </script>
 
 <template>
     <ElRow :gutter="10">
         <ElCol :span="8">
             <div class="vec-field">
-                <CoordinateNumInput v-model="internalValue.x" color="#cb2600" @value-change="onValueChange.bind(null, 'x')"></CoordinateNumInput>
+                <CoordinateNumInput v-model="internalValue.x" color="#cb2600"></CoordinateNumInput>
             </div>
         </ElCol>
         <ElCol :span="8">

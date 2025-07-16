@@ -9,6 +9,14 @@ export class Platform extends Component {
     @property(Prefab)
     protected testPrefab : Prefab;
 
+    @property(Prefab)
+    protected toucheLayer : Prefab;
+
+    protected onLoad(): void {
+        const node = instantiate(this.toucheLayer);
+        director.addPersistRootNode(node);
+    }
+
     onClickSendScene() {
         globalInfo.bridge.connect();
     }
@@ -23,6 +31,7 @@ export class Platform extends Component {
         // // // const testNode = instantiate(this.testPrefab)
         // this.selectedNode.insertChild(node, 0);
         tween(node).to(3,{ position : v3(100, 0, 1) }).start();
+        
         // node.parent = this.selectedNode;
 
         // setTimeout(() => {
