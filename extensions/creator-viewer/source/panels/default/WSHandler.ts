@@ -1,10 +1,35 @@
 import { WebSocketServer, WebSocket, AddressInfo } from 'ws';
 import * as cvMiddleward from './CreatorViewerMiddleware';
+import { nextTick, ref } from 'vue';
 
 const LISTEN_PORT = 33000;
 
 export function startListener() {
     return tryStartListenServer(LISTEN_PORT);
+}
+
+type MessageHandler = () => void
+
+const queue = ref<MessageHandler[]>([])
+let isProcessing = false
+
+function processQueue() {
+  if (isProcessing || queue.value.length === 0) return
+
+  isProcessing = true
+  const task = queue.value.shift()
+
+  task?.()
+
+  nextTick(() => {
+    isProcessing = false
+    processQueue()
+  })
+}
+
+function enqueueMessage(handler: MessageHandler) {
+  queue.value.push(handler)
+  processQueue()
 }
 
 let clientSocket : WebSocket;
@@ -33,8 +58,11 @@ async function tryStartListenServer(startPort: number, maxCheckPorts: number = s
                 console.log(`on client connected`);
                 incomingClient.on('message', function (message) {
                     const msObj = JSON.parse(message.toString()) as C2S_CreatorViewerMessage;
-                    messageHandler(msObj);
-                    console.log(`in coming message`, message.toString());
+                    console.log(`in coming message  ${Date.now()}   `, message.toString());
+                    // enqueueMessage(()=>{
+                    //     messageHandler(msObj)
+                    // })
+                    messageHandler(msObj)
                 })
 
                 incomingClient.on('error', ()=>{
@@ -54,7 +82,7 @@ async function tryStartListenServer(startPort: number, maxCheckPorts: number = s
         }
     }
 }
-
+let msgId = 0;
 function sendMessageToClient(data : S2C_CreatorViewerMessage) {
     console.log(`send data to client `, clientSocket, data);
     if(!clientSocket) return;
@@ -76,7 +104,9 @@ function messageHandler(messageData : C2S_CreatorViewerMessage) {
         }
         break;
         case 'children_order_change' : {
-            cvMiddleward.onChildrenOrderChange(messageData.data);
+            enqueueMessage(() => {
+                cvMiddleward.onChildrenOrderChange(messageData.data);
+            })
         }
         break;
         case 'node_active_change' : {
@@ -89,6 +119,14 @@ function messageHandler(messageData : C2S_CreatorViewerMessage) {
         break;
         case 'child_added' : {
             cvMiddleward.onChildAdd(messageData.data.parentUuid, messageData.data.childInfo);
+        }
+        break;
+        case 'track_attrs' : {
+            cvMiddleward.onAttrsTrack(messageData.data);
+        }
+        break;
+        case 'on_tracked_prop_change': {
+            cvMiddleward.onTrackedPropChanged(messageData.data.targetUuid, messageData.data.propName, messageData.data.newValue);
         }
         break;
     }

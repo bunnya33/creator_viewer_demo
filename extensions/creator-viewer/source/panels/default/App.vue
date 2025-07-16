@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ElButton, ElCheckbox, ElNotification, ElText, ElTree, TabsPaneContext, TreeInstance } from 'element-plus';
-import { onMounted, provide, ref } from 'vue';
+import { ElButton, ElCheckbox, ElNotification, ElText, ElTree, TabsPaneContext, TreeInstance, TreeNode } from 'element-plus';
+import { nextTick, onMounted, provide, ref } from 'vue';
 import ElCssLoader from './../../ElCSSLoader';
 import ViewerPropCollapse from './components/property/ViewerPropCollapse.vue';
-import { ClientBridge, nodeTreeData, refreshNodeActiveStatus, treeRef } from './CreatorViewerMiddleware';
+import { ClientBridge, nodeTreeData, trackPropGroupDatas, refreshNodeActiveStatus, treeRef } from './CreatorViewerMiddleware';
 import { startListener } from './WSHandler';
 import { AddressInfo } from 'ws';
 
@@ -32,6 +32,8 @@ function handleClick(pane: TabsPaneContext, event) {
 
 const handleNodeClick = (data) => {
     console.log(data);
+    console.log(treeRef.value.getNode(data.uuid))
+    ClientBridge.onNodeSelect(data.uuid);
 }
 
 const onHandleNodeCheckedChange = (checked: any, data: INodeInfo) => {
@@ -61,15 +63,14 @@ function onHandleNodeCollapse(nodeInfo: INodeInfo) {
     index != -1 && expandNodes.value.splice(index, 1);
 }
 
-function onClickEditTest() {
-    console.log(treeRef.value.getNode('34kE1xIB1Ha6xHkJ6Y/vyU'));
-    const data = JSON.stringify(treeRef.value.getNode('34kE1xIB1Ha6xHkJ6Y/vyU').data);
-    treeRef.value.remove(treeRef.value.getNode('34kE1xIB1Ha6xHkJ6Y/vyU'));
+function onHandleNodeDrop(drapNode) {
+    const nodeInfo = drapNode;
 
-    setTimeout(() => {
-        nodeTreeData.value[0].children[0].children[3].children.push(JSON.parse(data));
-        // treeRef.value.getNode('34KMJzUedL24Z4JBfJ1D8R').childNodes.push()
-    }, 2000);
+    const newNode = treeRef.value.getNode(nodeInfo.data.uuid);
+    const newParent = newNode.parent;
+    nextTick(()=>{
+        ClientBridge.onNodeParentOrSiblingIndexChange(newNode.data.uuid, newParent.data.uuid, newParent.childNodes.indexOf(newNode));
+    })
 }
 
 function onClickExpandAll() {
@@ -78,6 +79,11 @@ function onClickExpandAll() {
         if(!expandNodes.value.includes(node.data.uuid)) expandNodes.value.push(node.data.uuid);
         node.expand();
     })
+}
+
+function onClickShowData() {
+    console.log(`tree ref `, treeRef);
+    console.log(`nodeTreeData `, nodeTreeData);
 }
 
 const defaultProps = {
@@ -109,8 +115,8 @@ window['propTestData'] = comps;
 <template style="height: 100%;">
     <div style="height: 100%; box-shadow: var(--el-border-color-light) 0px 0px 10px">
         <ElText>{{ listeningPort }}</ElText>
-        <ElButton @click="onClickEditTest">测试节点默认展开</ElButton>
         <ElButton @click="onClickExpandAll">展开所有</ElButton>
+        <ElButton @click="onClickShowData">显示数据</ElButton>
         <el-splitter layout="vertical">
             <el-splitter-panel>
                 <div class="demo-panel">
@@ -120,7 +126,7 @@ window['propTestData'] = comps;
                             :defaultExpandAll="false" :check-on-click-node="false" :check-on-click-leaf="false"
                             :auto-expand-parent="false" :draggable="true" node-key="uuid" @node-click="handleNodeClick"
                             :allow-drop="allowDropCheck" :allowDrag="allowDragCheck"
-                            @node-expand="onHandleNodeExpand" @node-collapse="onHandleNodeCollapse"
+                            @node-expand="onHandleNodeExpand" @node-collapse="onHandleNodeCollapse" @node-drop="onHandleNodeDrop"
                             :default-expanded-keys="expandNodes">
 
                             <template #default="{ node, data }">
@@ -138,7 +144,7 @@ window['propTestData'] = comps;
             </el-splitter-panel>
             <el-splitter-panel>
                 <div class="demo-panel">
-                    <ViewerPropCollapse :items="comps" />
+                    <ViewerPropCollapse :items="trackPropGroupDatas" />
                 </div>
             </el-splitter-panel>
         </el-splitter>

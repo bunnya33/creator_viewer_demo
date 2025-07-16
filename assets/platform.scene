@@ -801,8 +801,8 @@
     "__prefab": null,
     "_contentSize": {
       "__type__": "cc.Size",
-      "width": 42.24285419170673,
-      "height": 50.400000000000006
+      "width": 42.255859375,
+      "height": 50.4
     },
     "_anchorPoint": {
       "__type__": "cc.Vec2",
@@ -834,7 +834,7 @@
     "_string": "label",
     "_horizontalAlign": 1,
     "_verticalAlign": 1,
-    "_actualFontSize": 25.27777777777778,
+    "_actualFontSize": 20,
     "_fontSize": 20,
     "_fontFamily": "Arial",
     "_lineHeight": 40,
@@ -1021,7 +1021,7 @@
     "_string": "button",
     "_horizontalAlign": 1,
     "_verticalAlign": 1,
-    "_actualFontSize": 25.27777777777778,
+    "_actualFontSize": 20,
     "_fontSize": 20,
     "_fontFamily": "Arial",
     "_lineHeight": 40,
@@ -1347,7 +1347,7 @@
     "_string": "Delete",
     "_horizontalAlign": 1,
     "_verticalAlign": 1,
-    "_actualFontSize": 25.27777777777778,
+    "_actualFontSize": 20,
     "_fontSize": 20,
     "_fontFamily": "Arial",
     "_lineHeight": 40,
@@ -1455,7 +1455,7 @@
     "node": {
       "__id__": 28
     },
-    "_enabled": true,
+    "_enabled": false,
     "__prefab": null,
     "clickEvents": [
       {
@@ -1556,7 +1556,7 @@
     "_prefab": null,
     "_lpos": {
       "__type__": "cc.Vec3",
-      "x": -512.56,
+      "x": 381.38,
       "y": 198.395,
       "z": 0
     },
@@ -1808,7 +1808,7 @@
     "_string": "Enter text here...",
     "_horizontalAlign": 0,
     "_verticalAlign": 1,
-    "_actualFontSize": 25.27777777777778,
+    "_actualFontSize": 20,
     "_fontSize": 20,
     "_fontFamily": "Arial",
     "_lineHeight": 40,
@@ -1971,8 +1971,8 @@
     "_prefab": null,
     "_lpos": {
       "__type__": "cc.Vec3",
-      "x": -372.69,
-      "y": -291.167,
+      "x": -338.019,
+      "y": -198.711,
       "z": 0
     },
     "_lrot": {
@@ -2907,7 +2907,7 @@
     "_string": "EditParent",
     "_horizontalAlign": 1,
     "_verticalAlign": 1,
-    "_actualFontSize": 25.27777777777778,
+    "_actualFontSize": 20,
     "_fontSize": 20,
     "_fontFamily": "Arial",
     "_lineHeight": 40,
@@ -3165,10 +3165,6 @@
     "__prefab": null,
     "selectedNode": {
       "__id__": 36
-    },
-    "testPrefab": {
-      "__uuid__": "fb9f862a-8226-4249-920a-c7fc34a5f735",
-      "__expectedType__": "cc.Prefab"
     },
     "_id": "99JYnSYZlIMYktChwTPTya"
   },

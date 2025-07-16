@@ -85,16 +85,35 @@ export class ViewBridgeBase {
     protected onReceiveMessage(ev: MessageEvent) {
         try {
             const data = JSON.parse(ev.data) as S2C_CreatorViewerMessage;
-            const mData = data.data;
-            switch(data.type) {
+            const type = data.type;
+            console.log(`receive message `,data);
+            switch(type) {
                 case 'change_node_active': {
-                    const node = globalInfo.allNodesMap.get(mData.nodeUuid);
+                    const node = globalInfo.allNodesMap.get(data.data.nodeUuid);
                     if(node) {
-                        node.active = mData.active;
+                        node.active = data.data.active;
                     }
                 }
                 break;
-                case 'change_siblingIndex':
+                case 'node_parent_or_sibling_index_change': {
+                    const node = globalInfo.allNodesMap.get(data.data.nodeUuid);
+                    const newParentNode = globalInfo.allNodesMap.get(data.data.parentUuid);
+                    if(node && newParentNode) {
+                        newParentNode.insertChild(node, data.data.siblingIndex);
+                    }
+                }
+                break;
+                case 'select_node': {
+                    this.selectNodeByUUid(data.data);
+                }
+                break;
+                case 'on_tracker_prop_change' : {
+                    const tracker = globalInfo.trackers.get(data.data.targetUuid);
+                    if(tracker) {
+                        tracker.modifyTrackProp(data.data.propName, data.data.value);
+                    }
+                }
+                break;
             } 
         } catch (error) {
             
@@ -108,12 +127,13 @@ export class ViewBridgeBase {
             return;
         }
         const trackers = node.selectNode();
-        const serializeDatas: Object[] = [];
+        const serializeDatas: ICCObjectPropGroup[] = [];
         trackers.forEach(tracker => {
             serializeDatas.push(tracker.getSerializeData());
         })
 
-        console.log(JSON.stringify(serializeDatas));
+        this.sendData({ type : 'track_attrs', data : serializeDatas})
+        // console.log(JSON.stringify(serializeDatas));
     }
 
     syncScene() {
@@ -139,6 +159,10 @@ export class ViewBridgeBase {
     onChildrenOrderChange(uuid: string, childrenOrder: Record<string, number>) {
         this.sendData({ type: 'children_order_change', data: { nodeUuid: uuid, childrenOrder: childrenOrder } });
     }
+
+    onTrackedPropValueChanged(targetUuid : string, propName : string, newValue : any) {
+        this.sendData({ type: 'on_tracked_prop_change', data: { targetUuid : targetUuid, propName : propName, newValue : newValue} });
+    }
 }
 
 export class GlobalInfo {
@@ -146,6 +170,8 @@ export class GlobalInfo {
     trackers: Map<string, ViewElementTracker> = new Map();
     allNodesMap: Map<string, Node> = new Map();
     allNodeInfosMap: Map<string, NodeInfo> = new Map();
+
+    selectedNode : NodeInfo;
 
     bridge: ViewBridgeBase = new ViewBridgeBase();
 
@@ -291,7 +317,6 @@ function getCCObjectClassEnum(target: CCObjectConstructor, propKey: string) {
     }
 }
 
-
 /** ElementTracker */
 class ViewElementTracker {
     static trackTarget(target: Node | Component) {
@@ -327,7 +352,7 @@ class ViewElementTracker {
 
     protected _uuid: string = '';
 
-    protected _type: string = '';
+    protected _type: 'node' | 'component' = 'node';
 
     protected _name: string = "";
 
@@ -472,6 +497,8 @@ class ViewElementTracker {
         else {
             trackedProp.value = newValue;
         }
+
+        globalInfo.bridge.onTrackedPropValueChanged(this._uuid, aliasOrKey, newValue);
     }
 
     modifyTrackProp(propName: string, value: any) {
@@ -492,7 +519,7 @@ class ViewElementTracker {
         }
     }
 
-    getSerializeData() {
+    getSerializeData() : ICCObjectPropGroup {
         const propsArray = [];
         this._trackPropCopys.forEach((valueCopy, key) => {
             propsArray.push({
@@ -667,6 +694,7 @@ class NodeInfo {
         // node.on(Node.EventType.ACTIVE_IN_HIERARCHY_CHANGED, this.onActiveInHierarchyChanged, this);
         node.on(Node.EventType.ACTIVE_CHANGED, this.onActiveChanged, this);
         globalInfo.allNodeInfosMap.set(node.uuid, this);
+        globalInfo.allNodesMap.set(node.uuid, node);
     }
 
     protected onComponentAdd(component: Component) {
@@ -674,6 +702,7 @@ class NodeInfo {
     }
 
     protected onActiveChanged(node: Node) {
+        if(node.active == this.active) return;
         this.active = node.active;
         globalInfo.bridge.onNodeActiveChanged(this.uuid, node.active);
     }
@@ -685,8 +714,14 @@ class NodeInfo {
 
     protected onNodeDestroyed() {
         console.log(`on node ${this.name} destroyed`);
+        if(globalInfo.selectedNode === this) {
+            this.unSelectNode();
+            globalInfo.selectedNode = undefined;
+        }
+
         globalInfo.bridge.onNodeDestroyed(this.uuid);
         globalInfo.allNodeInfosMap.delete(this.uuid);
+        globalInfo.allNodesMap.delete(this.uuid);
     }
 
     addChildNodeInfo(nodeInfo: NodeInfo) {
@@ -696,25 +731,26 @@ class NodeInfo {
     }
 
     protected onChildRemove(child: Node) {
-        Logger.log(`on child removed ${child.uuid}`);
+        Logger.log(`on child removed ${child.uuid}`, this);
         const index = this.children.findIndex(nodeInfo => nodeInfo.uuid == child.uuid);
         this.childrenUUidMap.delete(child.uuid);
         this.childrenNameMap.delete(child.name);
-        globalInfo.allNodesMap.delete(child.uuid);
+        
         if (index != -1) {
-            globalInfo.allNodeInfosMap.delete(child.uuid);
             this.children.splice(index, 1);
         }
         globalInfo.bridge.onChildRemove(child.uuid);
     }
 
     protected onChildAdd(child: Node) {
+        console.log(new Error().stack);
         Logger.log(`on child add ${child.uuid}`, this);
-        globalInfo.allNodesMap.set(child.uuid, child);
-        globalInfo.allNodeInfosMap.set(child.uuid, this);
-        const childInfo = walkNode(child, this);
+        const childInfo = globalInfo.allNodeInfosMap.get(child.uuid) || walkNode(child, this);
         this.addChildNodeInfo(childInfo);
 
+        // setTimeout(()=>{
+        //     globalInfo.bridge.onChildAdd(this.uuid, childInfo);
+        // },10);
         globalInfo.bridge.onChildAdd(this.uuid, childInfo);
     }
 
@@ -732,8 +768,8 @@ class NodeInfo {
 
         this.children.sort((a, b) => a.siblingIndex - b.siblingIndex);
 
-
         globalInfo.bridge.onChildrenOrderChange(this.uuid, childrenOrder);
+        // globalInfo.bridge.onChildrenOrderChange(this.uuid, childrenOrder);
     }
 
     onNodeNameChange(newName: string) {
@@ -756,6 +792,8 @@ class NodeInfo {
     }
 
     selectNode() {
+        globalInfo.selectedNode?.unSelectNode();
+        globalInfo.selectedNode = this;
         const trackers: ViewElementTracker[] = [];
         trackers.push(ViewElementTracker.trackTarget(globalInfo.allNodesMap.get(this.uuid)));
         this.components.forEach(comp => {
@@ -788,12 +826,15 @@ class NodeInfo {
 }
 
 function walkNode(node: Node, parent?: NodeInfo) {
+    if(globalInfo.allNodeInfosMap.has(node.uuid)) {
+        console.log(`walk same node`);
+        return globalInfo.allNodeInfosMap.get(node.uuid);
+    }
     const nodeInfo = new NodeInfo(node);
     nodeInfo.name = node.name;
     nodeInfo.uuid = node.uuid;
     nodeInfo.parent = parent;
     nodeInfo.active = node.active;
-    globalInfo.allNodesMap.set(node.uuid, node);
     node.children.forEach(child => nodeInfo.addChildNodeInfo(walkNode(child, nodeInfo)));
     return nodeInfo;
 }

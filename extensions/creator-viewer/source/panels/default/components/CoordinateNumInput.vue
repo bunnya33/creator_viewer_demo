@@ -6,7 +6,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineProps, defineEmits, watch } from 'vue'
+import { computed, defineProps, defineEmits, watch, onBeforeMount } from 'vue'
 import { ElInputNumber } from 'element-plus'
 
 const props = defineProps<{
@@ -14,11 +14,20 @@ const props = defineProps<{
     color?: string
 }>()
 
-const emit = defineEmits(['update:modelValue'])
+onBeforeMount(()=>{
+    console.log(`onBeforeMount`);
+})
+
+const emit = defineEmits<{
+    (e : 'value-change', value : number)
+}>()
 
 const model = computed({
     get: () => props.modelValue,
-    set: (val) => emit('update:modelValue', val),
+    set: (val) => {
+        emit('value-change', val);
+        console.log(`vupdate value`);
+    },
 })
 
 // 动态颜色样式

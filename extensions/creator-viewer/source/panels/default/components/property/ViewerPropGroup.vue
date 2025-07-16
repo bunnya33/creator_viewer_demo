@@ -11,7 +11,7 @@
         </template>
         <div v-for="(item, index) in propData.props.filter(prop=>prop.key !== '_name' && prop.key !== '_enabled')" :key="index">
             <ViewerPropBase :vprops="{ propName : item.key, index : index}">
-                <component :is="getComponent(item.type)" v-bind="typeof item.value === 'object' ? item.value : {}" v-model="item.value" />
+                <component :is="getComponent(item.type)" v-bind="typeof item.value === 'object' ? item.value : {}" v-model="item.value" :uuid="propData.uuid" :propName="item.key" />
             </ViewerPropBase>
         </div>
     </ElCollapseItem>
@@ -30,6 +30,7 @@ import ViewerPropNumInput from './prop-components/ViewerPropNumInput.vue';
 import ViewerPropVec2 from './prop-components/ViewerPropVec2.vue';
 import ViewerPropVec3 from './prop-components/ViewerPropVec3.vue';
 import ViewerPropVec4 from './prop-components/ViewerPropVec4.vue';
+import ViewerPropSize from './prop-components/ViewerPropSize.vue';
 
 const props = defineProps<{propData : ICCObjectPropGroup}>();
 
@@ -74,6 +75,7 @@ function getComponent(type: cvSupportType) {
     else if(type === 'Color') return ViewerPropColor;
     else if(type === 'Enum') return ViewerPropEnum;
     else if(type === 'boolean') return ViewerPropBoolean;
+    else if(type === 'Size') return ViewerPropSize;
 
     return ViewerPropInput;
 }

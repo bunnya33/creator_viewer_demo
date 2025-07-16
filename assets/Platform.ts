@@ -1,4 +1,4 @@
-import { _decorator, Component, director, instantiate, Node, Prefab } from 'cc';
+import { _decorator, Component, director, instantiate, Node, Prefab, tween, v3, Vec3 } from 'cc';
 const { ccclass, property } = _decorator;
 
 @ccclass('Platform')
@@ -19,11 +19,11 @@ export class Platform extends Component {
 
     onClickEditParent() {
         const node = this.node.getChildByName("PageView");
-        node.parent = undefined;
-        // // const testNode = instantiate(this.testPrefab)
+        // node.parent = undefined;
+        // // // const testNode = instantiate(this.testPrefab)
         // this.selectedNode.insertChild(node, 0);
-
-        node.parent = this.selectedNode;
+        tween(node).to(3,{ position : v3(100, 0, 1) }).start();
+        // node.parent = this.selectedNode;
 
         // setTimeout(() => {
         //     director.loadScene('newscene');

@@ -10,11 +10,11 @@ declare global {
         /** 子节点 */
         children: INodeInfo[];
         /** 当前节点是否是可视状态(本地维护) */
-        activeInHierarchy ?: boolean;
+        activeInHierarchy?: boolean;
         /** 节点顺序索引 */
         siblingIndex: number;
         /** 节点是否是激活状态 */
-        active : boolean;
+        active: boolean;
         /** 父节点是否是激活状态 */
         parentActive?: boolean;
         /** 父节点Uuid */
@@ -25,6 +25,31 @@ declare global {
 
     /** 场景节点信息 */
     type ISceneData = INodeInfo[];
+
+    interface ICCObjectProp {
+        /** 属性名称 */
+        key: string;
+        /** 属性类型 */
+        type: cvSupportType;
+        /** 值 */
+        value?: any;
+    }
+
+    /** CCObject 属性组 */
+    interface ICCObjectPropGroup {
+        /** 属性组所属的节点或组件名称 */
+        name: string;
+        /** 属性组所属的Object类型 */
+        type: "component" | "node";
+        /** 所属对象的uuid（用于反向查找节点或组件） */
+        uuid: string;
+        /** CCObject 所拥有的属性 */
+        props: ICCObjectProp[];
+    }
+
+    /** Creator Viewer 支持的属性类型 */
+    type cvSupportType = "string" | "number" | "boolean" | "Vec2" | "Vec3" | "Vec4" | "Color" | "Enum" | "Size" | "Rect";
+
 
     /** Creator Viewer 消息定义 */
     type C2S_CreatorViewerMessage =
@@ -38,11 +63,18 @@ declare global {
         | { type: 'child_removed'; data: string }
         /** 子节点被移除 */
         | { type: 'child_added'; data: { parentUuid: string, childInfo: INodeInfo } }
-                /** 节点激活状态变化 */
+        /** 节点激活状态变化 */
         | { type: 'node_active_change'; data: { nodeUuid: string, active: boolean } }
+        /** 节点激活状态变化 */
+        | { type: 'track_attrs'; data: ICCObjectPropGroup[] }
+        /** 节点激活状态变化 */
+        | { type: 'on_tracked_prop_change'; data: { targetUuid : string, propName : string, newValue : any }}
 
 
-    type S2C_CreatorViewerMessage = 
-        { type : 'change_node_active', data : { nodeUuid : string, active : boolean} } |
-        { type : 'change_siblingIndex', data : { nodeUuid : string, active : boolean} };
+    type S2C_CreatorViewerMessage =
+        { type: 'change_node_active'; data: { nodeUuid: string, active: boolean } }
+        | { type: 'node_parent_or_sibling_index_change'; data: { nodeUuid: string, parentUuid: string, siblingIndex: number } }
+        /** 选择某个节点 */
+        | { type: 'select_node'; data: string }
+        | { type: 'on_tracker_prop_change', data: { targetUuid: string, propName: string, value: any } };
 }

@@ -9,32 +9,13 @@ interface EnumItem {
 }
 
 declare global {
-    interface ICCObjectProp {
-        /** 属性名称 */
-        key: string;
-        /** 属性类型 */
-        type: cvSupportType;
-        /** 值 */
-        value?: any;
-    }
-
-    /** CCObject 属性组 */
-    interface ICCObjectPropGroup {
-        /** 属性组所属的节点或组件名称 */
-        name: string;
-        /** 属性组所属的Object类型 */
-        type: "component" | "node";
-        /** 所属对象的uuid（用于反向查找节点或组件） */
-        uuid: string;
-        /** CCObject 所拥有的属性 */
-        props: ICCObjectProp[];
-    }
-
-    /** Creator Viewer 支持的属性类型 */
-    type cvSupportType = "string" | "number" | "boolean" | "Vec2" | "Vec3" | "Vec4" | "Color" | "Enum" | "Size" | "Rect";
-
     /** 命名 cvType 支持的内置类型 */
     namespace cvType {
+        interface Size {
+            width : number;
+            height : number;
+        }
+
         interface Vec2 {
             x: number;
             y: number;
