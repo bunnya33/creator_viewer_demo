@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ElButton, ElCheckbox, ElInput, ElNotification, ElText, ElTree, FilterNodeMethodFunction, TabsPaneContext, TreeInstance, TreeNode } from 'element-plus';
+import { ElButton, ElCheckbox, ElInput, ElNotification, ElSplitter, ElSplitterPanel, ElText, ElTree, FilterNodeMethodFunction, TabsPaneContext, TreeInstance, TreeNode } from 'element-plus';
 import { nextTick, onMounted, provide, ref, watch } from 'vue';
 import ElCssLoader from './../../ElCSSLoader';
 import ViewerPropCollapse from './components/property/ViewerPropCollapse.vue';
@@ -100,7 +100,7 @@ watch(filterText, (val) => {
 
 const filterNode: FilterNodeMethodFunction = (value: string, data: Tree) => {
   if (!value) return true
-  console.log(data);
+//   console.log(data);
   return data.name.includes(value)
 }
 
@@ -131,14 +131,16 @@ window['propTestData'] = comps;
 </script>
 
 <template style="height: 100%;">
-    <div style="height: 100%; box-shadow: var(--el-border-color-light) 0px 0px 10px">
-        <ElText>{{ listeningPort }}</ElText>
-        <ElButton @click="onClickExpandAll">展开所有</ElButton>
-        <ElButton @click="onClickShowData">显示数据</ElButton>
-        <ElInput :prefix-icon="Filter" v-model="filterText" class="w-60 mb-2" placeholder="输入节点名称" />
-        <el-splitter layout="vertical">
-            <el-splitter-panel>
-                <div class="demo-panel">
+    <div style="height: 100%; box-shadow: var(--el-border-color-light) 0px 0px 10px;display: flex; flex-direction: column;">
+        <div style="display: flex; flex-direction: row;"> 
+            <ElText>{{ listeningPort }}</ElText>
+            <ElButton @click="onClickExpandAll">展开所有</ElButton>
+            <ElButton @click="onClickShowData">显示数据</ElButton>
+            <ElInput :prefix-icon="Filter" v-model="filterText" class="w-60 mb-2" placeholder="输入节点名称" />
+        </div>
+        <ElSplitter layout="vertical">
+            <ElSplitterPanel>
+                <div>
                     <div ref="root">
                         <ElTree ref="treeRef" style="width: 100%;" :data="nodeTreeData" :props="defaultProps"
                             :show-checkbox="false" :check-strictly="true" :indent="18" :highlight-current="true"
@@ -146,7 +148,7 @@ window['propTestData'] = comps;
                             :auto-expand-parent="false" :draggable="true" node-key="uuid" @node-click="handleNodeClick"
                             :allow-drop="allowDropCheck" :allowDrag="allowDragCheck"
                             @node-expand="onHandleNodeExpand" @node-collapse="onHandleNodeCollapse" @node-drop="onHandleNodeDrop"
-                            :default-expanded-keys="expandNodes" :filter-node-method="filterNode">
+                            :default-expanded-keys="expandNodes" :filter-node-method="filterNode" empty-text="等待Creator客户端连接">
 
                             <template #default="{ node, data }">
                                 <ElCheckbox v-model="data.active" @click.stop
@@ -160,13 +162,11 @@ window['propTestData'] = comps;
                     </div>
 
                 </div>
-            </el-splitter-panel>
-            <el-splitter-panel>
-                <div class="demo-panel">
-                    <ViewerPropCollapse :items="trackPropGroupDatas" />
-                </div>
-            </el-splitter-panel>
-        </el-splitter>
+            </ElSplitterPanel>
+            <ElSplitterPanel style="display: flex; flex-direction: column;">
+                <ViewerPropCollapse style="display: flex; flex-direction: column;" :items="trackPropGroupDatas" />
+            </ElSplitterPanel>
+        </ElSplitter>
     </div>
 </template>
 

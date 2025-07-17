@@ -1,5 +1,5 @@
 <template>
-    <ElCollapseItem :title="props.propData.type == 'node' ? 'Node' : props.propData.name">
+    <ElCollapseItem :title="props.propData.type == 'node' ? props.propData.name : props.propData.name">
         <template #title="{ isActive }">
           <div :class="['title-wrapper', { 'is-active': isActive }]">
             <ElCheckbox @click.stop class="test" v-model="checkboxModel" @change="onCheckChange"></ElCheckbox>
@@ -79,9 +79,6 @@ function refreshCheckedStatus() {
     }
 }
 refreshCheckedStatus();
-// setInterval(()=>{
-//     console.log(props);
-// }, 5000);
 
 const propNameWidth = inject('propNameWidth', ref(120));
 const propResizing = inject('propResizing', ref(false));

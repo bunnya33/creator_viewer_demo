@@ -1,4 +1,4 @@
-import { gfx, isValid, UIRenderer } from 'cc';
+import { gfx, isValid, Sprite, UIRenderer } from 'cc';
 import { CCObject, Color, Component, Director, director, js, Node, Rect, Scene, Size, ValueType, Vec2, Vec3, Vec4 } from 'cc';
 import { EDITOR_NOT_IN_PREVIEW } from 'cc/env';
 
@@ -116,7 +116,7 @@ export class ViewBridgeBase {
                 break;
             } 
         } catch (error) {
-            
+            console.error(error);
         }
     }
 
@@ -131,7 +131,7 @@ export class ViewBridgeBase {
         trackers.forEach(tracker => {
             serializeDatas.push(tracker.getSerializeData());
         })
-
+        console.log(serializeDatas);
         this.sendData({ type : 'track_attrs', data : serializeDatas})
         // console.log(JSON.stringify(serializeDatas));
     }
@@ -213,11 +213,34 @@ class ViewerColor {
     a: number;
 }
 
+interface ITrackPropConfigGroup {
+    customItems ?: ITrackerPropConfig[];
+    replaceMap ?: Record<string, string>;
+}
 
-const ReflectForceSetterProps: Map<CCObjectConstructor, ITrackerPropConfig[]> = new Map();
-ReflectForceSetterProps.set(CCObject, [{ key: '_objFlags' }]);
-ReflectForceSetterProps.set(Node, [{ key: "_lpos", alias: "position", setFunc: "setPosition" }, { key: "_lscale", alias: "scale", setFunc: "setScale" }, { key: "_euler", alias: "eulerAngle" }, { key: "_name" }]);
+const ReflectForceSetterProps: Map<CCObjectConstructor, ITrackPropConfigGroup> = new Map();
 globalInfo['ReflectForceSetterProps'] = ReflectForceSetterProps;
+
+// CCObject 只处理ObjectFlag
+ReflectForceSetterProps.set(CCObject, 
+    { customItems : [{ key: '_objFlags' }]}
+);
+// Node 特殊处理属性
+ReflectForceSetterProps.set(Node, {
+    customItems: [
+        { key: "_lpos", alias: "position", setFunc: "setPosition" }, 
+        { key: "_lscale", alias: "scale", setFunc: "setScale" }, 
+        { key: "_euler", alias: "eulerAngle" }, 
+        { key: "_name" }
+    ]
+});
+
+// Node 特殊处理属性
+ReflectForceSetterProps.set(Sprite, {
+    replaceMap : { '_useGrayscale' : 'grayscale'}
+});
+
+
 
 const ClassEnumPropCustomDefine: Map<CCObjectConstructor, ITrackerPropEnumConfig[]> = new Map();
 ClassEnumPropCustomDefine.set(UIRenderer, [{ key: '_srcBlendFactor', enumDefine: gfx.BlendFactor }, { key: '_dstBlendFactor', enumDefine: gfx.BlendFactor }]);
@@ -284,10 +307,13 @@ function getCCObjectClassEnum(target: CCObjectConstructor, propKey: string) {
         for (const cdefine of customDefine) {
             if (cdefine.key == propKey) {
                 const enumList = [];
+                let enumfilterCached = [];
                 Object.keys(cdefine.enumDefine).forEach(key => {
+                    if(enumfilterCached.includes(key)) return;
                     const reflectKey = cdefine.enumDefine[key];
+                    enumfilterCached.push(reflectKey);
                     enumList.push({
-                        key: reflectKey,
+                        name: reflectKey,
                         value: parseInt(key)
                     })
                 })
@@ -448,7 +474,14 @@ class ViewElementTracker {
             if (prop.type == PROP_EDIT_TYPE.PROP) {
                 const curValue = this._target[key];
                 Reflect.defineProperty(this._target, key, prop.original);
-                this._target[key] = curValue;
+                if(typeof(curValue) == 'object') {
+                    Object.keys(curValue).forEach(subKey=>{
+                        this._target[subKey] = curValue[subKey];
+                    })
+                }
+                else {
+                    this._target[key] = curValue;
+                }
             }
             else if (prop.type == PROP_EDIT_TYPE.OBJECT) {
                 Reflect.defineProperty(this._target, key, prop.original);
@@ -517,6 +550,20 @@ class ViewElementTracker {
         if (typeof tracker.original == "function") {
             tracker.original.call(tracker.target || this._target, value);
         }
+        else {
+            if(Reflect.has(this._targetPropsReplacer, propName)) {
+                if(typeof(this._targetPropsReplacer[propName]) == "object" && typeof(value) == 'object') {
+                    Object.keys(value).forEach(key=>{
+                        this._targetPropsReplacer[propName][key] = value[key];
+                    })
+                }
+                else if(typeof(this._targetPropsReplacer[propName]) == typeof(value))  {
+                    this._targetPropsReplacer[propName] = value;
+                }
+            }
+            //
+            console.log(`value tracker change`, tracker);
+        }
     }
 
     getSerializeData() : ICCObjectPropGroup {
@@ -541,7 +588,7 @@ class ViewElementTracker {
         return this._type;;
     }
 
-    protected processPropTrack(key: string, alias?: string, setFunc?: string) {
+    protected processPropTrack(key: string, alias?: string, setFunc?: string, customSetterKey ?: string) {
         if (this._trackedPropsMap.has(key)) return;
         const srcValue = this._target[key];
         const self = this;
@@ -561,7 +608,7 @@ class ViewElementTracker {
 
         // 处理存在 _prop的变量 并且有 prop的 setter 方法，认定为同一个属性
         if (key.startsWith("_")) {
-            const setterKey = key.substring(1);
+            const setterKey = customSetterKey || key.substring(1);
             const setterDescriptor = getPropertyDescriptor(this._target, setterKey);
             // console.log(`set key ${setterKey}   `, setterDescriptor);
             if (typeof (setterDescriptor?.set) == "function") {
@@ -611,8 +658,8 @@ class ViewElementTracker {
             }
         }
         else {
-            const setterDescriptor = Reflect.getOwnPropertyDescriptor(this._target, key);
-            this.recordCCObjectEdit(key, PROP_EDIT_TYPE.PROP, setterDescriptor);
+            const propDescriptor = Reflect.getOwnPropertyDescriptor(this._target, key);
+            this.recordCCObjectEdit(key, PROP_EDIT_TYPE.PROP, propDescriptor);
             this.recordPropTrack(key, alias, key, this._target[key], false);
             this._targetPropsReplacer[key] = this._target[key];
             const self = this;
@@ -625,8 +672,8 @@ class ViewElementTracker {
                 get() {
                     return self._targetPropsReplacer[key];
                 }, // 保持 getter 不变
-                configurable: setterDescriptor.configurable,
-                enumerable: setterDescriptor.enumerable
+                configurable: propDescriptor.configurable,
+                enumerable: propDescriptor.enumerable
             });
         }
     }
@@ -637,18 +684,33 @@ class ViewElementTracker {
         for (const ctor of ReflectForceSetterProps.keys()) {
             if (this._target instanceof ctor) {
                 const fprops = ReflectForceSetterProps.get(ctor);
-                fprops.forEach(fprop => {
+                fprops.customItems?.forEach(fprop => {
                     this.processPropTrack(fprop.key, fprop.alias, fprop.setFunc);
                 })
             }
         }
 
+        const reflectSetter = ReflectForceSetterProps.get(this._target.constructor as CCObjectConstructor);
+        let hasCustomSetterConfig = false;
+        let hasReplaceSetter = false;
+        console.log('analyzeTargetTrack', this._target);
+        if(reflectSetter) {
+            hasCustomSetterConfig = Reflect.has(reflectSetter, 'customItems');
+            hasReplaceSetter = Reflect.has(reflectSetter, 'replaceMap');
+            console.log(reflectSetter, this._target);
+        }
         // 如果没有特殊处理，默认全部属性都监听
-        if (!ReflectForceSetterProps.has(this._target.constructor as CCObjectConstructor)) {
+        if (!hasCustomSetterConfig) {
             const valueKeys = this._target.constructor?.['__values__'] || [];
             Reflect.ownKeys(this._target).forEach(key => {
                 if (!valueKeys.includes(key) || key == "node") return;
-                this.processPropTrack(key.toString());
+                if(hasReplaceSetter) {
+                    //@ts-ignore
+                    this.processPropTrack(key.toString(), reflectSetter['replaceMap'][key], undefined, reflectSetter['replaceMap'][key]);
+                }
+                else {
+                    this.processPropTrack(key.toString());
+                }
             })
         }
     }

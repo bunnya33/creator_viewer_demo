@@ -5,13 +5,8 @@ import CoordinateNumInput from '../../CoordinateNumInput.vue';
 import { ClientBridge, trackersMap } from '../../../CreatorViewerMiddleware';
 
 const props = defineProps<{ modelValue: cvType.Vec3, uuid : string, propName : string  }>();
-// const selectedComponentsMap : Map<string, ICCObjectPropGroup> = new Map();
-// // const compsMap = ref(selectedComponentsMap);
-
-// const compsMap = inject(/* 注入名 */ 'selectedComps', /* 值 */ ref(selectedComponentsMap));
 
 const tracker = trackersMap.get(props.uuid + props.propName);
-console.log(`find in tracker vec3 `, tracker);
 
 const internalValue = reactive({
     x: props.modelValue.x,
@@ -81,3 +76,5 @@ watch(
     width: 16px;
 }
 </style>
+
+

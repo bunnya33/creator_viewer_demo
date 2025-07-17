@@ -4,7 +4,7 @@ export { }
 
 /** 枚举类型的单项 */
 interface EnumItem {
-    key: string;
+    name: string;
     value: string | number;
 }
 

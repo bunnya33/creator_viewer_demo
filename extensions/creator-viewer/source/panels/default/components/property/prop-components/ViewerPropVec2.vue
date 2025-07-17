@@ -2,20 +2,32 @@
 import { ElCol, ElInputNumber, ElRow, ElText } from 'element-plus';
 import { reactive, watch } from 'vue';
 import CoordinateNumInput from '../../CoordinateNumInput.vue';
+import { ClientBridge, trackersMap } from '../../../CreatorViewerMiddleware';
 
-const props = defineProps<{ modelValue: cvType.Vec2 }>();
-const emit = defineEmits(['update:modelValue'])
+const props = defineProps<{ modelValue: cvType.Vec2, uuid : string, propName : string  }>();
+
+const tracker = trackersMap.get(props.uuid + props.propName);
 
 const internalValue = reactive({
     x: props.modelValue.x,
-    y: props.modelValue.y,
+    y: props.modelValue.y
 })
 
 watch(
-    () => props.modelValue,
+    tracker,
     (newVal) => {
-        internalValue.x = newVal.x
-        internalValue.y = newVal.y
+        internalValue.x = newVal.x;
+        internalValue.y = newVal.y;
+    },
+    { deep: true }
+)
+
+watch(
+    internalValue,
+    (newVal) => {
+        console.log(`on ${props.uuid}  ${props.propName}  vec2 changed `, newVal);
+        if(newVal.x == tracker.value.x && newVal.y == tracker.value.y) return;
+        ClientBridge.onTargetPropChange(props.uuid, props.propName, newVal);
     },
     { deep: true }
 )

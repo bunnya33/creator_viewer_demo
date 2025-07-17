@@ -1,12 +1,12 @@
 <template>
     <div class="color-bar-wrapper" :style="barWrapperStyle">
         <div class="color-bar" :style="barStyle" />
-        <ElInputNumber v-model="model" v-bind="$attrs" size="small" controls-position="right" class="custom-input" />
+        <ElInputNumber ref="inputWrapperRef" :step="0.1" v-model="model" v-bind="$attrs" size="small" controls-position="right" @focus="onFocus" class="custom-input" />
     </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineProps, defineEmits, watch, onBeforeMount } from 'vue'
+import { computed, defineProps, defineEmits, watch, onBeforeMount, onMounted, ref } from 'vue'
 import { ElInputNumber } from 'element-plus'
 
 const props = defineProps<{
@@ -14,9 +14,20 @@ const props = defineProps<{
     color?: string
 }>()
 
+const inputWrapperRef = ref<HTMLElement | null>(null);
+
 onBeforeMount(()=>{
     console.log(`onBeforeMount`);
 })
+
+onMounted((...args)=>{
+    console.log(args);
+})
+
+function handleKeyDown(event ) {
+    console.log(event);
+}
+
 
 const emit = defineEmits<{
     (e : 'value-change', value : number)
@@ -37,6 +48,10 @@ const barStyle = computed(() => ({
 
 const barWrapperStyle = {
     backgroundColor: 'transparent',
+}
+
+function onFocus(event : FocusEvent) {
+    console.log(`on coordinate focus `, event);
 }
 </script>
 

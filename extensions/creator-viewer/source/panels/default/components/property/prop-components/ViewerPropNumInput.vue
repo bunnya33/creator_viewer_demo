@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ElInput, ElInputNumber } from 'element-plus';
 import { onMounted } from 'vue';
+import { ClientBridge } from '../../../CreatorViewerMiddleware';
 
 
-const props = defineProps<{  modelValue: string }>();
-const emit = defineEmits(['update:modelValue']);
+const props = defineProps<{  modelValue: string, uuid: string, propName: string }>();
 
 onMounted(()=>{
     // console.log(props);
@@ -12,8 +12,8 @@ onMounted(()=>{
 
 
 
-function onInput(value: string) {
-  emit('update:modelValue', value)
+function onInput(value: number) {
+  ClientBridge.onTargetPropChange(props.uuid, props.propName, value);
 }
 
 </script>
@@ -22,7 +22,7 @@ function onInput(value: string) {
       <ElRow :gutter="10">
         <ElCol :span="16">
           <div class="vec-field">
-            <ElInputNumber class="vec-field" size="small" v-model="props.modelValue" controls-position="right"></ElInputNumber>
+            <ElInputNumber :step="0.1" class="vec-field" size="small" v-model="props.modelValue" controls-position="right" @change="onInput"></ElInputNumber>
             </div>
         </ElCol>
     </ElRow>
