@@ -1,12 +1,18 @@
 <template>
-    <ElCollapse expand-icon-position="left" v-for="(item, index) in items" :key="index">
+    <ElCollapse v-model="propCollapseActiveNames" expand-icon-position="left" v-for="(item, index) in items" :key="index">
         <ViewerPropGroup :prop-data="item"></ViewerPropGroup>
     </ElCollapse>
 </template>
 
 <script setup lang="ts">
-import { provide, ref } from 'vue';
+import { onMounted, provide, ref } from 'vue';
 import ViewerPropGroup from './ViewerPropGroup.vue';
+import { ElCollapse } from 'element-plus';
+import { propCollapseActiveNames } from '../../CreatorViewerMiddleware';
+
+onMounted(()=>{
+    console.log(`propCollapsePanelRef`, propCollapseActiveNames);
+})
 
 const props = defineProps({
     items: {

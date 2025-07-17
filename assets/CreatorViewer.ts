@@ -1,4 +1,4 @@
-import { gfx, isValid, Sprite, UIRenderer } from 'cc';
+import { gfx, isValid, Sprite, UIRenderer, UITransform } from 'cc';
 import { CCObject, Color, Component, Director, director, js, Node, Rect, Scene, Size, ValueType, Vec2, Vec3, Vec4 } from 'cc';
 import { EDITOR_NOT_IN_PREVIEW } from 'cc/env';
 
@@ -71,6 +71,26 @@ export class ViewBridgeBase {
         this._websocket = new WebSocket("ws://localhost:33000");
         this._websocket.onopen = this.onConnected.bind(this);
         this._websocket.onmessage = this.onReceiveMessage.bind(this);
+        this._websocket.onclose = this.onSocketError.bind(this);
+        this._websocket.onerror = this.onSocketError.bind(this);
+    }
+
+    close() {
+        if(this._websocket) {
+            this._websocket.onopen = undefined;
+            this._websocket.onmessage = undefined;
+            this._websocket.onclose = undefined;
+            this._websocket.onerror = undefined;
+            this._websocket.close();
+            this._websocket = undefined;
+        }
+    }
+
+    protected onSocketError() {
+        this.close();
+        setTimeout(()=>{
+            this.connect();
+        },500);
     }
 
     protected onConnected() {
@@ -216,6 +236,7 @@ class ViewerColor {
 interface ITrackPropConfigGroup {
     customItems ?: ITrackerPropConfig[];
     replaceMap ?: Record<string, string>;
+    multiSetters ?: Record<string, string[]>;
 }
 
 const ReflectForceSetterProps: Map<CCObjectConstructor, ITrackPropConfigGroup> = new Map();
@@ -239,6 +260,13 @@ ReflectForceSetterProps.set(Node, {
 ReflectForceSetterProps.set(Sprite, {
     replaceMap : { '_useGrayscale' : 'grayscale'}
 });
+
+// Node 特殊处理属性
+ReflectForceSetterProps.set(UITransform, {
+    multiSetters : { '_contentSize' : ['setContentSize'], '_anchorPoint' : ['setAnchorPoint']},
+    
+});
+
 
 
 
@@ -588,7 +616,7 @@ class ViewElementTracker {
         return this._type;;
     }
 
-    protected processPropTrack(key: string, alias?: string, setFunc?: string, customSetterKey ?: string) {
+    protected processPropTrack(key: string, alias?: string, setFunc?: string, customSetterKey ?: string, multiSetters ?: Record<string , string[]>) {
         if (this._trackedPropsMap.has(key)) return;
         const srcValue = this._target[key];
         const self = this;
@@ -610,7 +638,8 @@ class ViewElementTracker {
         if (key.startsWith("_")) {
             const setterKey = customSetterKey || key.substring(1);
             const setterDescriptor = getPropertyDescriptor(this._target, setterKey);
-            // console.log(`set key ${setterKey}   `, setterDescriptor);
+
+            let hasRecordProp = false;
             if (typeof (setterDescriptor?.set) == "function") {
                 const originalSetter = setterDescriptor.set;
                 this.recordCCObjectEdit(setterKey, PROP_EDIT_TYPE.SETTER, originalSetter);
@@ -621,8 +650,27 @@ class ViewElementTracker {
                 }
 
                 Reflect.defineProperty(this._target, setterKey, setterDescriptor);
-                return;
+                hasRecordProp = true;
             }
+
+            if(multiSetters && multiSetters[key]) {
+                multiSetters[key].forEach(setFuncName=>{
+                    const srcFunc = this._target[setFuncName];
+                    this._target[setFuncName] = function (...args) {
+                        const result = srcFunc.apply(self._target, args);
+                        self.onPropValueChange(alias || key, self._target[key]);
+                        return result;
+                    }
+                    this.recordCCObjectEdit(setFuncName, PROP_EDIT_TYPE.FUNC_HOOK, srcFunc);
+                    if(!hasRecordProp) {
+                        this.recordPropTrack(key, alias, setterKey, this._target[key], true);
+                        hasRecordProp = true;
+                    }
+                })
+            }
+            if(hasRecordProp) return;
+            // console.log(`set key ${setterKey}   `, setterDescriptor);
+
         }
 
         if (typeof (srcValue) == "object") {
@@ -693,10 +741,12 @@ class ViewElementTracker {
         const reflectSetter = ReflectForceSetterProps.get(this._target.constructor as CCObjectConstructor);
         let hasCustomSetterConfig = false;
         let hasReplaceSetter = false;
+        let multiSetters : Record<string, string[]>;
         console.log('analyzeTargetTrack', this._target);
         if(reflectSetter) {
             hasCustomSetterConfig = Reflect.has(reflectSetter, 'customItems');
             hasReplaceSetter = Reflect.has(reflectSetter, 'replaceMap');
+            multiSetters = reflectSetter.multiSetters;
             console.log(reflectSetter, this._target);
         }
         // 如果没有特殊处理，默认全部属性都监听
@@ -706,10 +756,10 @@ class ViewElementTracker {
                 if (!valueKeys.includes(key) || key == "node") return;
                 if(hasReplaceSetter) {
                     //@ts-ignore
-                    this.processPropTrack(key.toString(), reflectSetter['replaceMap'][key], undefined, reflectSetter['replaceMap'][key]);
+                    this.processPropTrack(key.toString(), reflectSetter['replaceMap'][key], undefined, reflectSetter['replaceMap'][key], multiSetters);
                 }
                 else {
-                    this.processPropTrack(key.toString());
+                    this.processPropTrack(key.toString(), undefined, undefined, undefined, multiSetters);
                 }
             })
         }

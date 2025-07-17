@@ -11,8 +11,6 @@ declare module 'vue' {
     ElCol: typeof import('element-plus/es')['ElCol']
     ElCollapse: typeof import('element-plus/es')['ElCollapse']
     ElRow: typeof import('element-plus/es')['ElRow']
-    ElSplitter: typeof import('element-plus/es')['ElSplitter']
-    ElSplitterPanel: typeof import('element-plus/es')['ElSplitterPanel']
     ElText: typeof import('element-plus/es')['ElText']
   }
 }

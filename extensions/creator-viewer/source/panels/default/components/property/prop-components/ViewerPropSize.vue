@@ -6,6 +6,16 @@ import { ClientBridge, trackersMap } from '../../../CreatorViewerMiddleware';
 const props = defineProps<{ modelValue: cvType.Size , uuid : string, propName : string  }>();
 const tracker = trackersMap.get(props.uuid + props.propName);
 
+watch(
+    tracker,
+    (newVal) => {
+        internalValue.width = newVal.width;
+        internalValue.height = newVal.height;
+    },
+    { deep: true }
+)
+
+
 const internalValue = reactive({
     width: props.modelValue.width,
     height: props.modelValue.height,

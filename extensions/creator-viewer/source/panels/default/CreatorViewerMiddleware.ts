@@ -1,13 +1,26 @@
-import { ElTree } from "element-plus";
-import { nextTick, Ref, ref } from "vue";
+import { ElCollapse, ElTree } from "element-plus";
+import { nextTick, Ref, ref, watch } from "vue";
 
 export const treeRef = ref<InstanceType<typeof ElTree>>();
+export const propCollapsePanelRef = ref<InstanceType<typeof ElCollapse>>();
+export const propCollapsePanelRefs = ref<InstanceType<typeof ElCollapse>>();
+export const propCollapseActiveNames = ref<string[]>([]);
 export const nodeTreeData = ref<INodeInfo[]>([]);
 export const unExpandNodes = ref<string[]>([]);
 export const client: { sender?: ClientSender } = {};
 export const trackPropGroupDatas = ref<ICCObjectPropGroup[]>([]);
 export const trackersMap: Map<string, Ref<any>> = new Map();
 export const isTrackedNodeActive = ref(true);
+
+watch(
+    () => propCollapsePanelRefs,
+    (newVal) => {
+        console.log(`on propCollapsePanelRefs, change`, newVal);
+    },
+    { deep: true }
+)
+
+
 
 let trackedNodeUuid = "";
 
@@ -47,7 +60,7 @@ export function onClientDisconnect() {
 
 export function onSceneTree(sceneData: ISceneData) {
     cleanNodeTree();
-    console.log(nodeTreeData);
+    // console.log(nodeTreeData);
     refreshNodeActiveStatus(sceneData[0], sceneData[0].active);
     nextTick(() => {
         nodeTreeData.value.push(...sceneData);
@@ -71,9 +84,6 @@ export function onChildRemoved(uuid: string) {
     if (!node) return;
     const parent = node.parent;
     parent.removeChild(node);
-    // treeRef.value.remove(node);
-    // console.log(treeRef.value.getNode(uuid));
-    // console.log(`parent data : `, [...parent.data.children]);
 }
 
 export function onChildAdd(parentUuid: string, nodeInfo: INodeInfo) {
@@ -87,6 +97,8 @@ export function onChildAdd(parentUuid: string, nodeInfo: INodeInfo) {
 export function onAttrsTrack(groups: ICCObjectPropGroup[]) {
     trackPropGroupDatas.value.length = 0;
     trackersMap.clear();
+    const activeNames : string[] = [];
+    propCollapseActiveNames.value.length = 0;
     groups.forEach(prop => {
         if(prop.type == 'node') {
             trackedNodeUuid = prop.uuid;
@@ -95,12 +107,16 @@ export function onAttrsTrack(groups: ICCObjectPropGroup[]) {
                 const nodeData = node.data as INodeInfo;
                 isTrackedNodeActive.value = nodeData.active;
         }
+
+        propCollapseActiveNames.value.push(prop.uuid);
         prop.props.forEach(propObj => {
             trackersMap.set(prop.uuid + propObj.key, ref(propObj.value));
         })
     })
+// console.log(propCollapsePanelRefs);
     nextTick(() => {
         trackPropGroupDatas.value.push(...groups);
+        // propCollapsePanelRef.value.setActiveNames(activeNames);
     })
     // const parentNode = treeRef.value.getNode(parentUuid);
     // if (!parentNode) return;

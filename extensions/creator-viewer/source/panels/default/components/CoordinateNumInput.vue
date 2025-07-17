@@ -17,11 +17,11 @@ const props = defineProps<{
 const inputWrapperRef = ref<HTMLElement | null>(null);
 
 onBeforeMount(()=>{
-    console.log(`onBeforeMount`);
+    // console.log(`onBeforeMount`);
 })
 
 onMounted((...args)=>{
-    console.log(args);
+    // console.log(args);
 })
 
 function handleKeyDown(event ) {

@@ -1,5 +1,5 @@
 <template>
-    <ElCollapseItem :title="props.propData.type == 'node' ? props.propData.name : props.propData.name">
+    <ElCollapseItem :title="props.propData.type == 'node' ? props.propData.name : props.propData.name" :name="props.propData.uuid">
         <template #title="{ isActive }">
           <div :class="['title-wrapper', { 'is-active': isActive }]">
             <ElCheckbox @click.stop class="test" v-model="checkboxModel" @change="onCheckChange"></ElCheckbox>
