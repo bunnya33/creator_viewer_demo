@@ -1,12 +1,12 @@
 <template>
     <div class="color-bar-wrapper" :style="barWrapperStyle">
         <div class="color-bar" :style="barStyle" />
-        <ElInputNumber ref="inputWrapperRef" :step="0.1" v-model="model" v-bind="$attrs" size="small" controls-position="right" @focus="onFocus" class="custom-input" />
+        <ElInputNumber ref="inputWrapperRef" :step="numStep" v-model="model" v-bind="$attrs" size="small" controls-position="right" @focus="onFocus" class="custom-input" />
     </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineProps, defineEmits, watch, onBeforeMount, onMounted, ref } from 'vue'
+import { computed, defineProps, defineEmits, watch, onBeforeMount, onMounted, ref, onUnmounted } from 'vue'
 import { ElInputNumber } from 'element-plus'
 
 const props = defineProps<{
@@ -14,20 +14,51 @@ const props = defineProps<{
     color?: string
 }>()
 
-const inputWrapperRef = ref<HTMLElement | null>(null);
+const inputWrapperRef = ref<InstanceType<typeof ElInputNumber>>(null);
+const numStep = ref(0.1);
 
-onBeforeMount(()=>{
-    // console.log(`onBeforeMount`);
+onUnmounted(()=>{
+    onMouseUp();
 })
 
 onMounted((...args)=>{
     // console.log(args);
+    const increaseButton = inputWrapperRef.value.$el as HTMLSpanElement;
+    increaseButton.onmousedown = ()=>{
+        onMouseDown();
+    }
+
+    increaseButton.onmouseup = ()=>{
+        onMouseUp();
+    }
+    console.log(inputWrapperRef);
 })
 
-function handleKeyDown(event ) {
-    console.log(event);
+
+
+let timer = null;
+let interval = 500 // 初始触发间隔（ms）
+
+function startPressLoop() {
+  timer = setTimeout(() => {
+    numStep.value += 0.1
+    interval = Math.max(50, interval * 0.9) // 每次减速，最低间隔50ms
+    startPressLoop() // 递归调用
+  }, interval)
 }
 
+function onMouseDown() {
+  interval = 500
+  startPressLoop()
+}
+
+function onMouseUp() {
+  if (timer) {
+    clearTimeout(timer)
+    timer = null
+    numStep.value = 0.1
+  }
+}
 
 const emit = defineEmits<{
     (e : 'value-change', value : number)

@@ -135,9 +135,8 @@ window['propTestData'] = comps;
         <div style="display: flex; flex-direction: row;"> 
             <ElText>{{ listeningPort }}</ElText>
             <ElButton @click="onClickExpandAll">展开所有</ElButton>
-            <ElButton @click="onClickShowData">显示数据</ElButton>
-            <ElInput :prefix-icon="Filter" v-model="filterText" class="w-60 mb-2" placeholder="输入节点名称" />
         </div>
+        <ElInput :prefix-icon="Filter" v-model="filterText" class="w-60 mb-2" placeholder="输入节点名称" />
         <ElSplitter layout="vertical">
             <ElSplitterPanel>
                 <div>

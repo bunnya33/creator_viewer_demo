@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ElInput } from 'element-plus';
 import { onMounted } from 'vue';
+import { ClientBridge } from '../../../CreatorViewerMiddleware';
 
 
-const props = defineProps<{  modelValue: string }>();
+const props = defineProps<{  modelValue: string ,uuid: string, propName: string }>();
 const emit = defineEmits(['update:modelValue']);
 
 onMounted(()=>{
@@ -14,6 +15,7 @@ onMounted(()=>{
 
 function onInput(value: string) {
   emit('update:modelValue', value)
+  ClientBridge.onTargetPropChange(props.uuid, props.propName, value);
 }
 
 </script>

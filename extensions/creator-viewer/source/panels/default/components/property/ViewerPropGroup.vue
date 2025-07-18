@@ -3,7 +3,7 @@
         <template #title="{ isActive }">
           <div :class="['title-wrapper', { 'is-active': isActive }]">
             <ElCheckbox @click.stop class="test" v-model="checkboxModel" @change="onCheckChange"></ElCheckbox>
-            {{ props.propData.type == 'node' ? 'Node' : props.propData.name }}
+            {{ props.propData.type == 'node' ? `Node<${props.propData.name}>` : props.propData.name }}
             <ElIcon size="large" style="right: 5px; position: absolute; top: 13px;bottom: 3px;">
               <component :is="iconMap[props.propData.type]"></component>
             </ElIcon>
@@ -57,7 +57,8 @@ function onCheckChange(value : boolean) {
     else {
         for(const prop of props.propData.props) {
             if(prop.key == "_enabled") {
-                isChecked.value = prop.value;
+                isChecked.value = value;
+                ClientBridge.onTargetPropChange(props.propData.uuid, '_enabled', value);
                 break;
             }
         }

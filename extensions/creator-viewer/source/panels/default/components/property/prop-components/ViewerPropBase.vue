@@ -61,7 +61,7 @@ function stopResize() {
     align-items: center;
     padding: 4px 0;
     position: relative;
-    height: 25px;
+    /* height: 25px; */
 }
 
 .property-value {

@@ -3166,6 +3166,14 @@
     "selectedNode": {
       "__id__": 36
     },
+    "testPrefab": {
+      "__uuid__": "0f66accf-d8f3-4b92-b79d-cec8d7af615a",
+      "__expectedType__": "cc.Prefab"
+    },
+    "toucheLayer": {
+      "__uuid__": "92214b9d-faaf-4129-b77b-ebe83e5ee910",
+      "__expectedType__": "cc.Prefab"
+    },
     "_id": "99JYnSYZlIMYktChwTPTya"
   },
   {
