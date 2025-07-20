@@ -15,7 +15,7 @@ onMounted(()=>{
 
 function onInput(value: string) {
   emit('update:modelValue', value)
-  ClientBridge.onTargetPropChange(props.uuid, props.propName, value);
+  ClientBridge.modifyTargetProp(props.uuid, props.propName, value);
 }
 
 </script>

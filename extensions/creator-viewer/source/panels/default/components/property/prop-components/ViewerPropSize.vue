@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ElCol, ElInputNumber, ElRow, ElText } from 'element-plus';
+import { ElCol, ElInputNumber, ElRow } from 'element-plus';
 import { reactive, watch } from 'vue';
 import { ClientBridge, trackersMap } from '../../../CreatorViewerMiddleware';
 
@@ -25,7 +25,9 @@ watch(
     () => internalValue,
     (newVal) => {
         if(newVal.width == tracker.value.width && newVal.height == tracker.value.height) return;
-        ClientBridge.onTargetPropChange(props.uuid, props.propName, newVal);
+        tracker.value.height = newVal.height;
+        tracker.value.width = newVal.width;
+        ClientBridge.modifyTargetProp(props.uuid, props.propName, newVal);
     },
     { deep: true }
 )

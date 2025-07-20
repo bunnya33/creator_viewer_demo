@@ -1,26 +1,17 @@
-import { ElCollapse, ElTree } from "element-plus";
-import { nextTick, Ref, ref, watch } from "vue";
+import { ElTree } from "element-plus";
+import { nextTick, Ref, ref } from "vue";
+import { ViewerChannel } from "../ViewerChannel";
 
 export const treeRef = ref<InstanceType<typeof ElTree>>();
-export const propCollapsePanelRef = ref<InstanceType<typeof ElCollapse>>();
-export const propCollapsePanelRefs = ref<InstanceType<typeof ElCollapse>>();
 export const propCollapseActiveNames = ref<string[]>([]);
 export const nodeTreeData = ref<INodeInfo[]>([]);
 export const unExpandNodes = ref<string[]>([]);
-export const client: { sender?: ClientSender } = {};
 export const trackPropGroupDatas = ref<ICCObjectPropGroup[]>([]);
 export const trackersMap: Map<string, Ref<any>> = new Map();
 export const isTrackedNodeActive = ref(true);
 
-watch(
-    () => propCollapsePanelRefs,
-    (newVal) => {
-        console.log(`on propCollapsePanelRefs, change`, newVal);
-    },
-    { deep: true }
-)
-
-
+export const viewerChannel = new ViewerChannel();
+viewerChannel.setMessageHandler(messageHandler, onClientDisconnect);
 
 let trackedNodeUuid = "";
 
@@ -53,14 +44,13 @@ function cleanNodeTree() {
     nodeTreeData.value.length = 0;
 }
 
-export function onClientDisconnect() {
+function onClientDisconnect() {
     cleanNodeTree();
     cleanTrackers();
 }
 
 export function onSceneTree(sceneData: ISceneData) {
     cleanNodeTree();
-    // console.log(nodeTreeData);
     refreshNodeActiveStatus(sceneData[0], sceneData[0].active);
     nextTick(() => {
         nodeTreeData.value.push(...sceneData);
@@ -113,16 +103,10 @@ export function onAttrsTrack(groups: ICCObjectPropGroup[]) {
             trackersMap.set(prop.uuid + propObj.key, ref(propObj.value));
         })
     })
-// console.log(propCollapsePanelRefs);
+
     nextTick(() => {
         trackPropGroupDatas.value.push(...groups);
-        // propCollapsePanelRef.value.setActiveNames(activeNames);
     })
-    // const parentNode = treeRef.value.getNode(parentUuid);
-    // if (!parentNode) return;
-    // const parentInfo = parentNode.data as INodeInfo;
-    // refreshNodeActiveStatus(nodeInfo, parentInfo.active);
-    // parentInfo.children.push(nodeInfo);
 }
 
 export function onTrackedPropChanged(targetUuid: string, propName: string, newValue: any) {
@@ -135,20 +119,84 @@ export function onTrackedPropChanged(targetUuid: string, propName: string, newVa
 //////////////////////////////////////// Message 2 Client
 export class ClientBridge {
     /** 节点激活状态修改 */
-    static onNodeActiveChange(nodeUuid: string, active: boolean) {
-        client.sender?.({ type: 'change_node_active', data: { nodeUuid, active } });
+    static setNodeActive(nodeUuid: string, active: boolean) {
+        viewerChannel.send({ type: 'change_node_active', data: { nodeUuid, active } });
     }
 
-    static onNodeParentOrSiblingIndexChange(nodeUuid: string, parentUuid: string, siblingIndex: number) {
-        client.sender?.({ type: 'node_parent_or_sibling_index_change', data: { nodeUuid, parentUuid, siblingIndex } });
+    static setNodeParentOrSiblingIndex(nodeUuid: string, parentUuid: string, siblingIndex: number) {
+        viewerChannel.send({ type: 'node_parent_or_sibling_index_change', data: { nodeUuid, parentUuid, siblingIndex } });
     }
 
-    static onNodeSelect(nodeUuid: string) {
-        client.sender?.({ type: 'select_node', data: nodeUuid });
+    static selectNode(nodeUuid: string) {
+        viewerChannel.send({ type: 'select_node', data: nodeUuid });
     }
 
-    static onTargetPropChange(targetUuid: string, propName: string, newValue: any) {
-        client.sender?.({ type: 'on_tracker_prop_change', data: { targetUuid, propName, value: newValue } })
+    static modifyTargetProp(targetUuid: string, propName: string, newValue: any) {
+        viewerChannel.send({ type: 'on_tracker_prop_change', data: { targetUuid, propName, value: newValue } })
+    }
+}
+
+type MessageHandler = () => void
+
+const queue = ref<MessageHandler[]>([])
+let isProcessing = false
+
+function processQueue() {
+  if (isProcessing || queue.value.length === 0) return
+
+  isProcessing = true
+  const task = queue.value.shift()
+
+  task?.()
+
+  nextTick(() => {
+    isProcessing = false
+    processQueue()
+  })
+}
+
+function enqueueMessage(handler: MessageHandler) {
+  queue.value.push(handler)
+  processQueue()
+}
+
+function messageHandler(messageData : C2S_CreatorViewerMessage) {
+    const type = messageData.type;
+    switch(type) {
+        case 'scene': {
+            onSceneTree(messageData.data);
+        }
+        break;
+        case 'node_destroyed': {
+            onNodeDestroyed(messageData.data);
+        }
+        break;
+        case 'children_order_change' : {
+            enqueueMessage(() => {
+                onChildrenOrderChange(messageData.data);
+            })
+        }
+        break;
+        case 'node_active_change' : {
+            onNodeActiveChange(messageData.data.nodeUuid, messageData.data.active);
+        }
+        break;        
+        case 'child_removed' : {
+            onChildRemoved(messageData.data);
+        }
+        break;
+        case 'child_added' : {
+            onChildAdd(messageData.data.parentUuid, messageData.data.childInfo);
+        }
+        break;
+        case 'track_attrs' : {
+            onAttrsTrack(messageData.data);
+        }
+        break;
+        case 'on_tracked_prop_change': {
+            onTrackedPropChanged(messageData.data.targetUuid, messageData.data.propName, messageData.data.newValue);
+        }
+        break;
     }
 }
 

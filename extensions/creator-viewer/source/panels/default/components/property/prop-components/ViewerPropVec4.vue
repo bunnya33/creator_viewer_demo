@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ElCol, ElInputNumber, ElRow } from 'element-plus';
+import { ElCol, ElRow } from 'element-plus';
 import { reactive, watch } from 'vue';
+import { ClientBridge, trackersMap } from '../../../CreatorViewerMiddleware';
 import CoordinateNumInput from '../../CoordinateNumInput.vue';
 
-const props = defineProps<{ modelValue: cvType.Vec4 }>();
-const emit = defineEmits(['update:modelValue'])
+const props = defineProps<{ modelValue: cvType.Vec4, uuid : string, propName : string  }>();
+
+const tracker = trackersMap.get(props.uuid + props.propName);
 
 const internalValue = reactive({
     x: props.modelValue.x,
@@ -14,12 +16,25 @@ const internalValue = reactive({
 })
 
 watch(
-    () => props.modelValue,
+    tracker,
     (newVal) => {
-        internalValue.x = newVal.x
-        internalValue.y = newVal.y
-        internalValue.z = newVal.z
-        internalValue.w = newVal.w
+        internalValue.x = newVal.x;
+        internalValue.y = newVal.y;
+        internalValue.z = newVal.z;
+        internalValue.w = newVal.w;
+    },
+    { deep: true }
+)
+
+watch(
+    internalValue,
+    (newVal) => {
+        if(newVal.x == tracker.value.x && newVal.y == tracker.value.y && newVal.z == tracker.value.z && newVal.w == tracker.value.w) return;
+        tracker.value.x = newVal.x;
+        tracker.value.y = newVal.y;
+        tracker.value.z = newVal.z;
+        tracker.value.w = newVal.w;
+        ClientBridge.modifyTargetProp(props.uuid, props.propName, newVal);
     },
     { deep: true }
 )

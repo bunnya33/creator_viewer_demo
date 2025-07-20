@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ElCol, ElRow } from 'element-plus';
-import { inject, reactive, ref, watch } from 'vue';
-import CoordinateNumInput from '../../CoordinateNumInput.vue';
+import { reactive, watch } from 'vue';
 import { ClientBridge, trackersMap } from '../../../CreatorViewerMiddleware';
+import CoordinateNumInput from '../../CoordinateNumInput.vue';
 
 const props = defineProps<{ modelValue: cvType.Vec3, uuid : string, propName : string  }>();
 
@@ -29,7 +29,10 @@ watch(
     (newVal) => {
         console.log(`on ${props.uuid}  ${props.propName}  vec3 changed `, newVal);
         if(newVal.x == tracker.value.x && newVal.y == tracker.value.y && newVal.z == tracker.value.z) return;
-        ClientBridge.onTargetPropChange(props.uuid, props.propName, newVal);
+        tracker.value.x = newVal.x;
+        tracker.value.y = newVal.y;
+        tracker.value.z = newVal.z;
+        ClientBridge.modifyTargetProp(props.uuid, props.propName, newVal);
     },
     { deep: true }
 )

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ElInput, ElInputNumber } from 'element-plus';
+import { ElInputNumber } from 'element-plus';
 import { onMounted, reactive, Ref, watch } from 'vue';
 import { ClientBridge, trackersMap } from '../../../CreatorViewerMiddleware';
 
@@ -25,7 +25,8 @@ watch(
     (newVal) => {
         console.log(`on ${props.uuid}  ${props.propName}  vec2 changed `, newVal);
         if(newVal.value == tracker.value) return;
-        ClientBridge.onTargetPropChange(props.uuid, props.propName, newVal.value);
+        tracker.value = newVal.value;
+        ClientBridge.modifyTargetProp(props.uuid, props.propName, newVal.value);
     },
     { deep: true }
 )
@@ -38,7 +39,7 @@ onMounted(()=>{
 
 
 function onInput(value: number) {
-  ClientBridge.onTargetPropChange(props.uuid, props.propName, value);
+  ClientBridge.modifyTargetProp(props.uuid, props.propName, value);
 }
 
 </script>

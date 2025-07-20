@@ -10,10 +10,6 @@ import ViewerPropGroup from './ViewerPropGroup.vue';
 import { ElCollapse } from 'element-plus';
 import { propCollapseActiveNames } from '../../CreatorViewerMiddleware';
 
-onMounted(()=>{
-    console.log(`propCollapsePanelRef`, propCollapseActiveNames);
-})
-
 const props = defineProps({
     items: {
         type: Array as () => Array<ICCObjectPropGroup>,

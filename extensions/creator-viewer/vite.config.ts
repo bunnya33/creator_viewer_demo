@@ -25,7 +25,7 @@ export default defineConfig({
             preserveEntrySignatures: "allow-extension",
             input : {
                 "main" : "source/main.ts",
-                "panels/default" : "source/panels/default/index.ts"
+                "panels/default" : "source/panels/index.ts"
             },
             output : {
                 format: "cjs",

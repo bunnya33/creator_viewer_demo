@@ -801,8 +801,8 @@
     "__prefab": null,
     "_contentSize": {
       "__type__": "cc.Size",
-      "width": 42.255859375,
-      "height": 50.4
+      "width": 42.24285419170673,
+      "height": 50.400000000000006
     },
     "_anchorPoint": {
       "__type__": "cc.Vec2",
@@ -834,7 +834,7 @@
     "_string": "label",
     "_horizontalAlign": 1,
     "_verticalAlign": 1,
-    "_actualFontSize": 20,
+    "_actualFontSize": 25.27777777777778,
     "_fontSize": 20,
     "_fontFamily": "Arial",
     "_lineHeight": 40,
@@ -1021,7 +1021,7 @@
     "_string": "button",
     "_horizontalAlign": 1,
     "_verticalAlign": 1,
-    "_actualFontSize": 20,
+    "_actualFontSize": 25.27777777777778,
     "_fontSize": 20,
     "_fontFamily": "Arial",
     "_lineHeight": 40,
@@ -1347,7 +1347,7 @@
     "_string": "Delete",
     "_horizontalAlign": 1,
     "_verticalAlign": 1,
-    "_actualFontSize": 20,
+    "_actualFontSize": 25.27777777777778,
     "_fontSize": 20,
     "_fontFamily": "Arial",
     "_lineHeight": 40,
@@ -1808,7 +1808,7 @@
     "_string": "Enter text here...",
     "_horizontalAlign": 0,
     "_verticalAlign": 1,
-    "_actualFontSize": 20,
+    "_actualFontSize": 25.27777777777778,
     "_fontSize": 20,
     "_fontFamily": "Arial",
     "_lineHeight": 40,
@@ -2907,7 +2907,7 @@
     "_string": "EditParent",
     "_horizontalAlign": 1,
     "_verticalAlign": 1,
-    "_actualFontSize": 20,
+    "_actualFontSize": 25.27777777777778,
     "_fontSize": 20,
     "_fontFamily": "Arial",
     "_lineHeight": 40,
@@ -3165,14 +3165,6 @@
     "__prefab": null,
     "selectedNode": {
       "__id__": 36
-    },
-    "testPrefab": {
-      "__uuid__": "0f66accf-d8f3-4b92-b79d-cec8d7af615a",
-      "__expectedType__": "cc.Prefab"
-    },
-    "toucheLayer": {
-      "__uuid__": "92214b9d-faaf-4129-b77b-ebe83e5ee910",
-      "__expectedType__": "cc.Prefab"
     },
     "_id": "99JYnSYZlIMYktChwTPTya"
   },

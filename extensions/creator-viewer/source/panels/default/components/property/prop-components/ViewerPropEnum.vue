@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ElCol, ElInputNumber, ElOption, ElRow, ElSelect } from 'element-plus';
-import { reactive, ref, watch } from 'vue';
+import { ElOption, ElSelect } from 'element-plus';
+import { reactive, watch } from 'vue';
 import { ClientBridge } from '../../../CreatorViewerMiddleware';
 
 const props = defineProps<{ modelValue: cvType.Enum, uuid: string, propName: string }>();
@@ -13,17 +13,11 @@ const internalValue = reactive({
 watch(
     () => internalValue,
     (newVal) => {
-      console.log(`on enum value change`);
         internalValue.enumValue = newVal.enumValue
-        ClientBridge.onTargetPropChange(props.uuid, props.propName, newVal.enumValue);
+        ClientBridge.modifyTargetProp(props.uuid, props.propName, newVal.enumValue);
     },
     { deep: true }
 )
-
-// setInterval(()=>{
-//   console.log(internalValue);
-// },5000)
-
 
 </script>
 

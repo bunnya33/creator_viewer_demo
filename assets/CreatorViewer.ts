@@ -2,13 +2,22 @@ import { gfx, isValid, Sprite, UIRenderer, UITransform } from 'cc';
 import { CCObject, Color, Component, Director, director, js, Node, Rect, Scene, Size, ValueType, Vec2, Vec3, Vec4 } from 'cc';
 import { EDITOR_NOT_IN_PREVIEW } from 'cc/env';
 
-const srclog = console.log;
+let srclog = console.log;
+let srcLogFunc = srclog;
 
 export class Logger {
+    static logEnable = false;
+    static logSwitch() {
+        this.logEnable = !this.logEnable;
+        srcLogFunc = this.logEnable ? srclog : ()=>{};
+    }
+
     static get log() {
-        return srclog.bind(console, logPrefix());
+        return srcLogFunc.bind(console);
     }
 }
+
+window['Logger'] = Logger;
 
 function logPrefix() {
     const dateTime = new Date();
@@ -68,7 +77,7 @@ export class ViewBridgeBase {
     protected _websocket: WebSocket;
 
     connect() {
-        this._websocket = new WebSocket("ws://192.168.66.23:33000");
+        this._websocket = new WebSocket("ws://127.0.0.1:33000");
         this._websocket.onopen = this.onConnected.bind(this);
         this._websocket.onmessage = this.onReceiveMessage.bind(this);
         this._websocket.onclose = this.onSocketError.bind(this);
@@ -94,7 +103,7 @@ export class ViewBridgeBase {
     }
 
     protected onConnected() {
-        console.log(`on websocket connect 建立连接，发送节点树数据`);
+        Logger.log(`on websocket connect 建立连接，发送节点树数据`);
         this.syncScene();
     }
 
@@ -106,7 +115,7 @@ export class ViewBridgeBase {
         try {
             const data = JSON.parse(ev.data) as S2C_CreatorViewerMessage;
             const type = data.type;
-            console.log(`receive message `,data);
+            Logger.log(`receive message `,data);
             switch(type) {
                 case 'change_node_active': {
                     const node = globalInfo.allNodesMap.get(data.data.nodeUuid);
@@ -151,9 +160,9 @@ export class ViewBridgeBase {
         trackers.forEach(tracker => {
             serializeDatas.push(tracker.getSerializeData());
         })
-        console.log(serializeDatas);
+        Logger.log(serializeDatas);
         this.sendData({ type : 'track_attrs', data : serializeDatas})
-        // console.log(JSON.stringify(serializeDatas));
+        // Logger.log(JSON.stringify(serializeDatas));
     }
 
     syncScene() {
@@ -211,7 +220,7 @@ type CCObjectConstructor = new (...args: any[]) => CCObject;
 interface ITrackerPropConfig {
     key: string;
     alias?: string;
-    setFunc?: string;
+    setFuncs?: string[];
     setterKey ?: string;
 }
 
@@ -256,8 +265,8 @@ ReflectForceSetterProps.set(CCObject,
 // Node 特殊处理属性
 ReflectForceSetterProps.set(Node, {
     customItems: [
-        { key: "_lpos", alias: "position", setFunc: "setPosition" }, 
-        { key: "_lscale", alias: "scale", setFunc: "setScale" }, 
+        { key: "_lpos", alias: "position", setFuncs: ["setPosition", "setWorldPosition"] }, 
+        { key: "_lscale", alias: "scale", setFuncs: ["setScale"] }, 
         { key: "_euler", alias: "eulerAngle", setterKey : 'eulerAngles' }, 
         { key: "_name" }
     ]
@@ -454,7 +463,7 @@ class ViewElementTracker {
     protected recordPropTrack(propKey: string, alias: string, trackKey: string, originalValue: any, hasSetter: boolean) {
         const aliasOrPropKey = alias || propKey;
         if (typeof (originalValue) == "object") {
-            // console.log(`record prop track value Type ${aliasOrPropKey} `, originalValue);
+            // Logger.log(`record prop track value Type ${aliasOrPropKey} `, originalValue);
             if (originalValue instanceof ValueType) {
                 if (originalValue instanceof Color) {
                     const copyObject = new ViewerColor(originalValue.r, originalValue.g, originalValue.b, originalValue.a);
@@ -463,7 +472,7 @@ class ViewElementTracker {
                         value: copyObject,
                         hasSetter: hasSetter
                     })
-                    console.log(JSON.stringify(copyObject));
+                    Logger.log(JSON.stringify(copyObject));
                 }
                 else {
                     const copyObject = originalValue.clone();
@@ -472,7 +481,7 @@ class ViewElementTracker {
                         value: copyObject,
                         hasSetter: hasSetter
                     })
-                    console.log(JSON.stringify(copyObject));
+                    Logger.log(JSON.stringify(copyObject));
                 }
             }
         }
@@ -542,7 +551,7 @@ class ViewElementTracker {
     }
 
     protected onPropValueChange(aliasOrKey: string, newValue: any) {
-        console.log(`on prop value change ${aliasOrKey} `, newValue);
+        Logger.log(`on prop value change ${aliasOrKey} `, newValue);
         const trackedProp = this._trackPropCopys.get(aliasOrKey);
         if (!trackedProp) {
             console.warn(`prop  ${aliasOrKey} is not tracked`);
@@ -597,7 +606,7 @@ class ViewElementTracker {
                 }
             }
             //
-            console.log(`value tracker change`, tracker);
+            Logger.log(`value tracker change`, tracker);
         }
     }
 
@@ -623,21 +632,28 @@ class ViewElementTracker {
         return this._type;;
     }
 
-    protected processPropTrack(key: string, alias?: string, setFunc?: string, customSetterKey ?: string, multiSetters ?: Record<string , IMultiSetterInfo[]>) {
+    protected processPropTrack(key: string, alias?: string, setFuncs?: string[], customSetterKey ?: string, multiSetters ?: Record<string , IMultiSetterInfo[]>) {
         if (this._trackedPropsMap.has(key)) return;
         const srcValue = this._target[key];
         const self = this;
 
-        if (setFunc) {
-            const srcFunc = this._target[setFunc];
-            this._target[setFunc] = function (...args) {
-                const result = srcFunc.apply(self._target, args);
-                self.onPropValueChange(alias || key, self._target[key]);
-                return result;
+        if (setFuncs && setFuncs.length > 0) {
+            let hasSetTrackProp = false;
+            for(const setFunc of setFuncs) {
+                const srcFunc = this._target[setFunc];
+                this._target[setFunc] = function (...args) {
+                    const result = srcFunc.apply(self._target, args);
+                    self.onPropValueChange(alias || key, self._target[key]);
+                    return result;
+                }
+    
+                this.recordCCObjectEdit(setFunc, PROP_EDIT_TYPE.FUNC_HOOK, srcFunc);
+                if(!hasSetTrackProp) {
+                    this.recordPropTrack(key, alias, setFunc, this._target[key], true);
+                    hasSetTrackProp = true;
+                }
             }
 
-            this.recordCCObjectEdit(setFunc, PROP_EDIT_TYPE.FUNC_HOOK, srcFunc);
-            this.recordPropTrack(key, alias, setFunc, this._target[key], true);
             return;
         }
 
@@ -698,7 +714,7 @@ class ViewElementTracker {
                 })
             }
             if(hasRecordProp) return;
-            // console.log(`set key ${setterKey}   `, setterDescriptor);
+            // Logger.log(`set key ${setterKey}   `, setterDescriptor);
 
         }
 
@@ -731,7 +747,7 @@ class ViewElementTracker {
                 });
             }
             else {
-                console.log(`normal object will not track key ${key}`, this._target[key]);
+                Logger.log(`normal object will not track key ${key}`, this._target[key]);
             }
         }
         else {
@@ -763,7 +779,7 @@ class ViewElementTracker {
                 const fprops = ReflectForceSetterProps.get(ctor);
                 let multiSetters = fprops.multiSetters;
                 fprops.customItems?.forEach(fprop => {
-                    this.processPropTrack(fprop.key, fprop.alias, fprop.setFunc, fprop.setterKey);
+                    this.processPropTrack(fprop.key, fprop.alias, fprop.setFuncs, fprop.setterKey);
                 })
             }
         }
@@ -772,12 +788,12 @@ class ViewElementTracker {
         let hasCustomSetterConfig = false;
         let hasReplaceSetter = false;
         let multiSetters : Record<string, IMultiSetterInfo[]>;
-        console.log('analyzeTargetTrack', this._target);
+        Logger.log('analyzeTargetTrack', this._target);
         if(reflectSetter) {
             hasCustomSetterConfig = Reflect.has(reflectSetter, 'customItems');
             hasReplaceSetter = Reflect.has(reflectSetter, 'replaceMap');
             multiSetters = reflectSetter.multiSetters;
-            console.log(reflectSetter, this._target);
+            Logger.log(reflectSetter, this._target);
         }
         // 如果没有特殊处理，默认全部属性都监听
         if (!hasCustomSetterConfig) {
@@ -854,7 +870,7 @@ class NodeInfo {
     }
 
     protected onNodeDestroyed() {
-        console.log(`on node ${this.name} destroyed`);
+        Logger.log(`on node ${this.name} destroyed`);
         if(globalInfo.selectedNode === this) {
             this.unSelectNode();
             globalInfo.selectedNode = undefined;
@@ -884,7 +900,7 @@ class NodeInfo {
     }
 
     protected onChildAdd(child: Node) {
-        // console.log(new Error().stack);
+        // Logger.log(new Error().stack);
         Logger.log(`on child add ${child.uuid}    index : ${ this._index}`, this);
         const childInfo = globalInfo.allNodeInfosMap.get(child.uuid) || walkNode(child, this);
         this.addChildNodeInfo(childInfo);
@@ -968,7 +984,7 @@ class NodeInfo {
 
 function walkNode(node: Node, parent?: NodeInfo) {
     if(globalInfo.allNodeInfosMap.has(node.uuid)) {
-        console.log(`walk same node`);
+        Logger.log(`walk same node`);
         return globalInfo.allNodeInfosMap.get(node.uuid);
     }
     const nodeInfo = new NodeInfo(node);
@@ -1026,7 +1042,7 @@ if (!EDITOR_NOT_IN_PREVIEW) {
 
     // const ws = new WebSocket("ws://localhost:8999");
     // ws.onopen = ()=>{
-    //     console.log(`on websocket connect`);
+    //     Logger.log(`on websocket connect`);
     //     ws.send(JSON.stringify({
     //         data : [globalInfo.sceneTree],
     //         type : "scene"

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ElColorPicker, ElInput } from 'element-plus';
-import { onMounted, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 import { ClientBridge } from '../../../CreatorViewerMiddleware';
 
 
@@ -69,10 +69,10 @@ watch(
 
         if (typeof (newVal) == "string") {
             inputColorString.value = newVal;
-            ClientBridge.onTargetPropChange(props.uuid, props.propName, parseColorString(newVal));
+            ClientBridge.modifyTargetProp(props.uuid, props.propName, parseColorString(newVal));
         }
         else {
-            ClientBridge.onTargetPropChange(props.uuid, props.propName, newVal);
+            ClientBridge.modifyTargetProp(props.uuid, props.propName, newVal);
         }
     }
 )
@@ -80,10 +80,10 @@ watch(
 function onValueChange(newVal) {
     if (typeof (newVal) == "string") {
         inputColorString.value = newVal;
-        ClientBridge.onTargetPropChange(props.uuid, props.propName, hexToRgba(newVal));
+        ClientBridge.modifyTargetProp(props.uuid, props.propName, hexToRgba(newVal));
     }
     else {
-        ClientBridge.onTargetPropChange(props.uuid, props.propName, newVal);
+        ClientBridge.modifyTargetProp(props.uuid, props.propName, newVal);
     }
 }
 

@@ -52,13 +52,13 @@ const checkboxModel = computed({
 
 function onCheckChange(value : boolean) {
     if(props.propData.type == "node") {
-        ClientBridge.onNodeActiveChange(props.propData.uuid, value);
+        ClientBridge.setNodeActive(props.propData.uuid, value);
     }
     else {
         for(const prop of props.propData.props) {
             if(prop.key == "_enabled") {
                 isChecked.value = value;
-                ClientBridge.onTargetPropChange(props.propData.uuid, '_enabled', value);
+                ClientBridge.modifyTargetProp(props.propData.uuid, '_enabled', value);
                 break;
             }
         }

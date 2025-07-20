@@ -1,6 +1,4 @@
-import { readFileSync } from 'fs-extra';
-import { join } from 'path';
-import { createApp, App } from 'vue';
+import { App, createApp } from 'vue';
 import AppTemplate from './App.vue';
 const panelDataMap = new WeakMap<any, App>();
 /**
