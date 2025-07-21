@@ -1,9 +1,6 @@
-import { gfx, isValid, Sprite, UIRenderer, UITransform } from 'cc';
+import { game, Game, gfx, isValid, Sprite, UIRenderer, UITransform } from 'cc';
 import { CCObject, Color, Component, Director, director, js, Node, Rect, Scene, Size, ValueType, Vec2, Vec3, Vec4 } from 'cc';
 import { EDITOR_NOT_IN_PREVIEW } from 'cc/env';
-
-let srclog = console.log;
-let srcLogFunc = srclog;
 
 export class Logger {
     static logEnable = false;
@@ -16,6 +13,11 @@ export class Logger {
         return srcLogFunc.bind(console);
     }
 }
+
+let srclog = console.log;
+let srcLogFunc = srclog;
+srcLogFunc = Logger.logEnable ? srclog : ()=>{};
+
 
 window['Logger'] = Logger;
 
@@ -76,15 +78,22 @@ export class ViewBridgeBase {
 
     protected _websocket: WebSocket;
 
+    protected _connected : boolean = false;
+
     connect() {
-        this._websocket = new WebSocket("ws://127.0.0.1:33000");
-        this._websocket.onopen = this.onConnected.bind(this);
-        this._websocket.onmessage = this.onReceiveMessage.bind(this);
-        this._websocket.onclose = this.onSocketError.bind(this);
-        this._websocket.onerror = this.onSocketError.bind(this);
+        try {
+            this._websocket = new WebSocket("ws://127.0.0.1:33000");
+            this._websocket.onopen = this.onConnected.bind(this);
+            this._websocket.onmessage = this.onReceiveMessage.bind(this);
+            this._websocket.onclose = this.onSocketError.bind(this);
+            this._websocket.onerror = this.onSocketError.bind(this);
+        } catch (error) {
+            
+        }
     }
 
     close() {
+        this._connected = false;
         if(this._websocket) {
             this._websocket.onopen = undefined;
             this._websocket.onmessage = undefined;
@@ -104,10 +113,13 @@ export class ViewBridgeBase {
 
     protected onConnected() {
         Logger.log(`on websocket connect 建立连接，发送节点树数据`);
+        this._connected = true;
         this.syncScene();
     }
 
     protected sendData(viewerData: C2S_CreatorViewerMessage) {
+        if(!this._connected) return;
+        
         this._websocket?.send(JSON.stringify(viewerData));
     }
 
