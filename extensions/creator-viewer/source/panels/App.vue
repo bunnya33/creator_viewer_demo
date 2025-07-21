@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import Viewer from './default/Viewer.vue';
+import Viewer from './renderer/Viewer.vue';
+
 import ElCssLoader from '../ElCSSLoader';
 
 onMounted(()=>{

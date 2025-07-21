@@ -1,6 +1,9 @@
-import { game, Game, gfx, isValid, Sprite, UIRenderer, UITransform } from 'cc';
+import { Asset, Game, game, gfx, isValid, Sprite, UIRenderer, UITransform } from 'cc';
 import { CCObject, Color, Component, Director, director, js, Node, Rect, Scene, Size, ValueType, Vec2, Vec3, Vec4 } from 'cc';
 import { EDITOR_NOT_IN_PREVIEW } from 'cc/env';
+
+let srclog = console.log;
+let srcLogFunc = srclog;
 
 export class Logger {
     static logEnable = false;
@@ -13,11 +16,6 @@ export class Logger {
         return srcLogFunc.bind(console);
     }
 }
-
-let srclog = console.log;
-let srcLogFunc = srclog;
-srcLogFunc = Logger.logEnable ? srclog : ()=>{};
-
 
 window['Logger'] = Logger;
 
@@ -78,22 +76,15 @@ export class ViewBridgeBase {
 
     protected _websocket: WebSocket;
 
-    protected _connected : boolean = false;
-
     connect() {
-        try {
-            this._websocket = new WebSocket("ws://127.0.0.1:33000");
-            this._websocket.onopen = this.onConnected.bind(this);
-            this._websocket.onmessage = this.onReceiveMessage.bind(this);
-            this._websocket.onclose = this.onSocketError.bind(this);
-            this._websocket.onerror = this.onSocketError.bind(this);
-        } catch (error) {
-            
-        }
+        this._websocket = new WebSocket("ws://127.0.0.1:33000");
+        this._websocket.onopen = this.onConnected.bind(this);
+        this._websocket.onmessage = this.onReceiveMessage.bind(this);
+        this._websocket.onclose = this.onSocketError.bind(this);
+        this._websocket.onerror = this.onSocketError.bind(this);
     }
 
     close() {
-        this._connected = false;
         if(this._websocket) {
             this._websocket.onopen = undefined;
             this._websocket.onmessage = undefined;
@@ -113,13 +104,10 @@ export class ViewBridgeBase {
 
     protected onConnected() {
         Logger.log(`on websocket connect 建立连接，发送节点树数据`);
-        this._connected = true;
         this.syncScene();
     }
 
     protected sendData(viewerData: C2S_CreatorViewerMessage) {
-        if(!this._connected) return;
-        
         this._websocket?.send(JSON.stringify(viewerData));
     }
 
@@ -398,6 +386,30 @@ function getCCObjectClassEnum(target: CCObjectConstructor, propKey: string) {
     }
 }
 
+function isCCObjectClassPropTypeMatch(target: CCObjectConstructor, setterKey : string, propName : string, parentClass : CCObjectConstructor) : [boolean, new()=>Asset] {
+    if (!target) return  [false, undefined];
+
+    if (target['__attrs__']) {
+        const setterClass = target['__attrs__'][`${setterKey}$_$ctor`];
+        if (setterClass) {
+            return [js.isChildClassOf(setterClass, parentClass), setterClass];
+        }
+
+        const srcClass = target['__attrs__'][`${propName}$_$ctor`];
+        if(srcClass) {
+            return [js.isChildClassOf(srcClass, parentClass), srcClass];
+        }
+
+
+        const prototype = Object.getPrototypeOf(target['__attrs__']);
+        if (prototype) {
+            return isCCObjectClassPropTypeMatch(prototype, setterKey, propName, parentClass);
+        }
+    }
+
+    return [false, undefined];
+}
+
 /** ElementTracker */
 class ViewElementTracker {
     static trackTarget(target: Node | Component) {
@@ -674,6 +686,12 @@ class ViewElementTracker {
             const setterKey = customSetterKey || key.substring(1);
             const setterDescriptor = getPropertyDescriptor(this._target, setterKey);
 
+                //@ts-ignore
+                const result = isCCObjectClassPropTypeMatch(this._target.constructor , setterKey, key, Asset);
+                if(result[0]) {
+                    console.log(`key ${key}  is Asset`, result);
+                }
+
             let hasRecordProp = false;
             if (typeof (setterDescriptor?.set) == "function") {
                 const originalSetter = setterDescriptor.set;
@@ -789,7 +807,6 @@ class ViewElementTracker {
         for (const ctor of ReflectForceSetterProps.keys()) {
             if (this._target instanceof ctor) {
                 const fprops = ReflectForceSetterProps.get(ctor);
-                let multiSetters = fprops.multiSetters;
                 fprops.customItems?.forEach(fprop => {
                     this.processPropTrack(fprop.key, fprop.alias, fprop.setFuncs, fprop.setterKey);
                 })
@@ -801,12 +818,14 @@ class ViewElementTracker {
         let hasReplaceSetter = false;
         let multiSetters : Record<string, IMultiSetterInfo[]>;
         Logger.log('analyzeTargetTrack', this._target);
+
         if(reflectSetter) {
             hasCustomSetterConfig = Reflect.has(reflectSetter, 'customItems');
             hasReplaceSetter = Reflect.has(reflectSetter, 'replaceMap');
             multiSetters = reflectSetter.multiSetters;
             Logger.log(reflectSetter, this._target);
         }
+
         // 如果没有特殊处理，默认全部属性都监听
         if (!hasCustomSetterConfig) {
             const valueKeys = this._target.constructor?.['__values__'] || [];
@@ -1052,14 +1071,7 @@ if (!EDITOR_NOT_IN_PREVIEW) {
         // Logger.log(JSON.stringify(globalInfo.sceneTree, undefined, 2));
     })
 
-    // const ws = new WebSocket("ws://localhost:8999");
-    // ws.onopen = ()=>{
-    //     Logger.log(`on websocket connect`);
-    //     ws.send(JSON.stringify({
-    //         data : [globalInfo.sceneTree],
-    //         type : "scene"
-    //     }));
+    game.on(Game.EVENT_GAME_INITED, ()=>{globalInfo.bridge.connect()});
 
-    // }
 
 }

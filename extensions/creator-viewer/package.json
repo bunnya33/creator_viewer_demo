@@ -37,9 +37,9 @@
             "main": "dist/panels/default",
             "size": {
                 "min-width": 400,
-                "min-height": 300,
-                "width": 1024,
-                "height": 600
+                "min-height": 600,
+                "width": 400,
+                "height": 850
             }
         }
     },
