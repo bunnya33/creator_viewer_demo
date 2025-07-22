@@ -16,6 +16,13 @@ declare global {
             height : number;
         }
 
+        interface Rect {
+            x : number;
+            y : number;
+            width : number;
+            height : number;
+        }
+
         interface Vec2 {
             x: number;
             y: number;

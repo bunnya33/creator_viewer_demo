@@ -47,9 +47,26 @@ declare global {
         props: ICCObjectProp[];
     }
 
-    /** Creator Viewer 支持的属性类型 */
-    type cvSupportType = "string" | "number" | "boolean" | "Vec2" | "Vec3" | "Vec4" | "Color" | "Enum" | "Size" | "Rect";
+    interface INodeTypeData {
+        isValid : boolean;
+        nodeName : string;
+        nodeUuid : string;
+    }
 
+    interface IComponentTypeData {
+        isValid : boolean;
+        nodeUuid : string;
+        componentName : string;
+        nodeName : string;
+    }
+
+    interface IAssetTypeData {
+        className: string;
+        assetName: string;
+    }
+
+    /** Creator Viewer 支持的属性类型 */
+    type cvSupportType = "string" | "number" | "boolean" | "Object" | "Vec2" | "Vec3" | "Vec4" | "Color" | "Enum" | "Size" | "Rect" | "Component" | "Node" | "Asset";
 
     /** Creator Viewer 消息定义 */
     type C2S_CreatorViewerMessage =
