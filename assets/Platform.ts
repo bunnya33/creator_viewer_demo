@@ -1,4 +1,4 @@
-import { _decorator, Component, director, instantiate, Node, Prefab, tween, v3, Vec3 } from 'cc';
+import { _decorator, Button, Component, director, instantiate, Node, Prefab, tween, v3, Vec3 } from 'cc';
 const { ccclass, property } = _decorator;
 
 @ccclass('Platform')
@@ -11,6 +11,9 @@ export class Platform extends Component {
 
     @property(Prefab)
     protected toucheLayer : Prefab;
+
+    @property(Button)
+    protected testButtonRef : Button;
 
     protected onLoad(): void {
         const node = instantiate(this.toucheLayer);

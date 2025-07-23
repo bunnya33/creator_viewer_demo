@@ -733,7 +733,7 @@ class ViewElementTracker {
         }
 
         const engineClass = getCCObjectClassPropTypeMatch(this._target.constructor as CCObjectConstructor, setterKeyAsset, key, Asset) ||
-            getCCObjectClassPropTypeMatch(this._target.constructor as CCObjectConstructor, setterKeyAsset, key, Node)
+            getCCObjectClassPropTypeMatch(this._target.constructor as CCObjectConstructor, setterKeyAsset, key, Node) || 
         getCCObjectClassPropTypeMatch(this._target.constructor as CCObjectConstructor, setterKeyAsset, key, Component);
 
         if(engineClass) {
@@ -751,6 +751,8 @@ class ViewElementTracker {
             }
             else if(js.isChildClassOf(engineClass, Component)) {
                 engineClassName = 'Component';
+
+                console.log(`Prop Track Component`);
             }
 
             Reflect.defineProperty(this._target, key, {
