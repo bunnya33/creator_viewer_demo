@@ -1,6 +1,6 @@
-import { Asset, Game, game, gfx, isValid, Sprite, UIRenderer, UITransform } from 'cc';
+import { Asset, assetManager, Canvas, EditBox, Game, game, gfx, Graphics, ImageAsset, isValid, Label, Sprite, SpriteFrame, Texture2D, UIRenderer, UITransform, Widget } from 'cc';
 import { CCObject, Color, Component, Director, director, js, Node, Rect, Scene, Size, ValueType, Vec2, Vec3, Vec4 } from 'cc';
-import { EDITOR_NOT_IN_PREVIEW } from 'cc/env';
+import { EDITOR, EDITOR_NOT_IN_PREVIEW } from 'cc/env';
 
 let srclog = console.log;
 let srcLogFunc = srclog;
@@ -78,26 +78,33 @@ export class ViewBridgeBase {
     protected _connected: boolean = false;
 
     connect() {
-        this._websocket = new WebSocket("ws://127.0.0.1:33000");
-        this._websocket.onopen = this.onConnected.bind(this);
-        this._websocket.onmessage = this.onReceiveMessage.bind(this);
-        this._websocket.onclose = this.onSocketError.bind(this);
-        this._websocket.onerror = this.onSocketError.bind(this);
+        try {
+            this._websocket = new WebSocket("ws://127.0.0.1:33000");
+            this._websocket.onopen = this.onConnected.bind(this);
+            this._websocket.onmessage = this.onReceiveMessage.bind(this);
+            this._websocket.onclose = this.onSocketError.bind(this);
+            this._websocket.onerror = this.onSocketError.bind(this);
+        } catch (error) {
+            console.log(error);
+        }
     }
 
     close() {
         this._connected = false;
         if (this._websocket) {
-            this._websocket.onopen = undefined;
-            this._websocket.onmessage = undefined;
-            this._websocket.onclose = undefined;
-            this._websocket.onerror = undefined;
-            this._websocket.close();
+            const websocket = this._websocket;
+            
             this._websocket = undefined;
+            websocket.close();
+            websocket.onopen = undefined;
+            websocket.onmessage = undefined;
+            websocket.onclose = undefined;
+            websocket.onerror = undefined;
         }
     }
 
     protected onSocketError() {
+        console.log(`onSocketError  `);
         this.close();
         setTimeout(() => {
             this.connect();
@@ -1131,7 +1138,7 @@ function walkNode(node: Node, parent?: NodeInfo) {
     return nodeInfo;
 }
 
-if (!EDITOR_NOT_IN_PREVIEW) {
+if (!EDITOR) {
     function patchNode() {
         // 获取原始属性描述符
         const descriptor = Reflect.getOwnPropertyDescriptor(Node.prototype, 'name');
@@ -1163,7 +1170,6 @@ if (!EDITOR_NOT_IN_PREVIEW) {
         globalInfo.allNodeInfosMap.clear();
         globalInfo.trackers.forEach(tracker => tracker.unTrack());
         globalInfo.selectedNode = undefined;
-        // Logger.log(JSON.stringify(globalInfo.sceneTree, undefined, 2));
     })
 
     director.on(Director.EVENT_AFTER_SCENE_LAUNCH, (scene: Scene) => {
@@ -1172,10 +1178,74 @@ if (!EDITOR_NOT_IN_PREVIEW) {
         globalInfo.allNodeInfosMap.clear();
         globalInfo.sceneTree = walkNode(scene);
         globalInfo.bridge.syncScene();
-        // Logger.log(JSON.stringify(globalInfo.sceneTree, undefined, 2));
     })
 
     game.on(Game.EVENT_GAME_INITED, () => { globalInfo.bridge.connect() });
 
+    function drawRoundedRect(g: Graphics, x: number, y: number, w: number, h: number, r: number) {
+        g.moveTo(x + r, y);
+        g.roundRect(x, y, w, h,r);
+    }
 
+    function createCreatorViewDebugLayer() {
+
+        const width = 8;
+        const height = 8;
+
+        // 创建纯白像素数据
+        const whitePixel = new Uint8Array(width * height * 4);
+        for (let i = 0; i < whitePixel.length; i += 4) {
+            whitePixel[i] = 255;     // R
+            whitePixel[i + 1] = 255; // G
+            whitePixel[i + 2] = 255; // B
+            whitePixel[i + 3] = 255; // A
+        }
+
+        // 创建 Texture2D
+        const texture = new Texture2D();
+        texture.reset({
+            width,
+            height,
+            format: Texture2D.PixelFormat.RGBA8888,
+        });
+        texture.uploadData(whitePixel); 
+
+        // 创建 SpriteFrame
+        const spriteFrame = new SpriteFrame();
+        spriteFrame.texture = texture;
+
+        // 创建节点并添加组件
+        const node = new Node('WhiteSprite');
+        const sprite = node.addComponent(Sprite);
+        sprite.spriteFrame = spriteFrame;
+
+        // 设置尺寸
+        const uiTransform = node.getComponent(UITransform);
+        uiTransform.setContentSize(100, 100); // 你想要的宽高
+
+
+        // setTimeout(()=>{
+        //     director.getScene().getChildByName("Canvas").addChild(node);
+        // }, 3000);
+        // 添加到场景中
+        const canvasNode = new Node();
+        const widget = canvasNode.addComponent(Widget);
+        canvasNode.addComponent(Canvas);
+        widget.isAlignBottom = widget.isAlignTop = widget.isAlignLeft = widget.isAlignRight = true;
+        widget.bottom = widget.top = widget.left = widget.right = 0;
+        director.addPersistRootNode(canvasNode);
+
+        const graphicsNode = new Node();
+        const graphicsComp = graphicsNode.addComponent(Graphics);
+        drawRoundedRect(graphicsComp, 0, 0, 200, 60, 10);
+        graphicsComp.fillColor = Color.YELLOW;
+        graphicsComp.fill();
+        canvasNode.addChild(graphicsNode);
+        const edit = graphicsNode.addComponent(EditBox);
+        edit.inputMode = EditBox.InputMode.SINGLE_LINE;
+        const inputLabel = graphicsNode.getChildByName('TEXT_LABEL').getComponent(Label);
+        inputLabel.fontSize = 26;
+        inputLabel.color = Color.BLACK;
+    }
+    createCreatorViewDebugLayer();
 }
