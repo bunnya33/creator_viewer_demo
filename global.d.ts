@@ -1,5 +1,5 @@
 import { v2 } from "cc";
-import { GlobalInfo } from "./assets/CreatorViewer";
+import { CreatorViewerDatas } from "./assets/CreatorViewer";
 declare global {
     /** 节点信息结构 */
     interface INodeInfo {
@@ -74,7 +74,7 @@ declare global {
     }
 
 
-    const globalInfo: GlobalInfo;
+    const creatorViewer: CreatorViewerDatas;
 
     /** 场景节点信息 */
     type ISceneData = INodeInfo[];

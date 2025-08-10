@@ -1,6 +1,7 @@
-import { Asset, assetManager, Canvas, EditBox, Game, game, gfx, Graphics, ImageAsset, isValid, Label, Sprite, SpriteFrame, Texture2D, UIRenderer, UITransform, Widget } from 'cc';
-import { CCObject, Color, Component, Director, director, js, Node, Rect, Scene, Size, ValueType, Vec2, Vec3, Vec4 } from 'cc';
-import { EDITOR, EDITOR_NOT_IN_PREVIEW } from 'cc/env';
+import { _decorator, Asset, BlockInputEvents, Button, Canvas, CCObject, Color, Component, Director, director, EditBox, EventTouch, gfx, Graphics, HorizontalTextAlignment, isValid, js, Label, Layout, Node, Overflow, Rect, Scene, size, Size, Sprite, sys, tween, Tween, UIOpacity, UIRenderer, UITransform, v2, v3, ValueType, Vec2, Vec3, Vec4, Widget } from 'cc';
+import { EDITOR } from 'cc/env';
+
+const { ccclass, property, requireComponent } = _decorator;
 
 let srclog = console.log;
 let srcLogFunc = srclog;
@@ -72,14 +73,16 @@ interface IPropCopy {
     hasSetter: boolean;
 }
 
-export class ViewBridgeBase {
-
+export class ViewBridgeBase extends Component {
     protected _websocket: WebSocket;
     protected _connected: boolean = false;
 
-    connect() {
+    protected _serverAddress: string = "";
+
+    connect(address: string) {
         try {
-            this._websocket = new WebSocket("ws://127.0.0.1:33000");
+            this._serverAddress = address;
+            this._websocket = new WebSocket(`ws://${address}`);
             this._websocket.onopen = this.onConnected.bind(this);
             this._websocket.onmessage = this.onReceiveMessage.bind(this);
             this._websocket.onclose = this.onSocketError.bind(this);
@@ -89,11 +92,12 @@ export class ViewBridgeBase {
         }
     }
 
-    close() {
+    close(mannual : boolean = false) {
+        this.unschedule(this.reconnect);
         this._connected = false;
         if (this._websocket) {
             const websocket = this._websocket;
-            
+
             this._websocket = undefined;
             websocket.close();
             websocket.onopen = undefined;
@@ -106,9 +110,11 @@ export class ViewBridgeBase {
     protected onSocketError() {
         console.log(`onSocketError  `);
         this.close();
-        setTimeout(() => {
-            this.connect();
-        }, 500);
+        this.scheduleOnce(this.reconnect, 1);
+    }
+
+    protected reconnect() {
+        this.connect(this._serverAddress);
     }
 
     protected onConnected() {
@@ -129,15 +135,15 @@ export class ViewBridgeBase {
             Logger.log(`receive message `, data);
             switch (type) {
                 case 'change_node_active': {
-                    const node = globalInfo.allNodesMap.get(data.data.nodeUuid);
+                    const node = creatorViewer.allNodesMap.get(data.data.nodeUuid);
                     if (node) {
                         node.active = data.data.active;
                     }
                 }
                     break;
                 case 'node_parent_or_sibling_index_change': {
-                    const node = globalInfo.allNodesMap.get(data.data.nodeUuid);
-                    const newParentNode = globalInfo.allNodesMap.get(data.data.parentUuid);
+                    const node = creatorViewer.allNodesMap.get(data.data.nodeUuid);
+                    const newParentNode = creatorViewer.allNodesMap.get(data.data.parentUuid);
                     if (node && newParentNode) {
                         newParentNode.insertChild(node, data.data.siblingIndex);
                     }
@@ -148,7 +154,7 @@ export class ViewBridgeBase {
                 }
                     break;
                 case 'on_tracker_prop_change': {
-                    const tracker = globalInfo.trackers.get(data.data.targetUuid);
+                    const tracker = creatorViewer.trackers.get(data.data.targetUuid);
                     if (tracker) {
                         tracker.modifyTrackProp(data.data.propName, data.data.value);
                     }
@@ -161,7 +167,7 @@ export class ViewBridgeBase {
     }
 
     selectNodeByUUid(uuid: string) {
-        const node = globalInfo.allNodeInfosMap.get(uuid);
+        const node = creatorViewer.allNodeInfosMap.get(uuid);
         if (!node) {
             console.warn(`未找到 uuid 为 ${uuid} 的节点，选择失败`);
             return;
@@ -177,7 +183,7 @@ export class ViewBridgeBase {
     }
 
     syncScene() {
-        this.sendData({ type: "scene", data: [globalInfo.sceneTree] });
+        this.sendData({ type: "scene", data: [creatorViewer.sceneTree] });
     }
 
     onNodeDestroyed(uuid: string) {
@@ -205,7 +211,7 @@ export class ViewBridgeBase {
     }
 }
 
-export class GlobalInfo {
+export class CreatorViewerDatas {
     sceneTree: NodeInfo;
     trackers: Map<string, ViewElementTracker> = new Map();
     allNodesMap: Map<string, Node> = new Map();
@@ -213,7 +219,7 @@ export class GlobalInfo {
 
     selectedNode: NodeInfo;
 
-    bridge: ViewBridgeBase = new ViewBridgeBase();
+    bridge: ViewBridgeBase;
 
     getCCObjectClassEnum: Function = getCCObjectClassEnum;
 }
@@ -221,9 +227,9 @@ export class GlobalInfo {
 const VIEWER_TRACKER = 'VIEWER_TRACKER';
 
 
-const globalInfo = new GlobalInfo();
-Reflect.defineProperty(window, "globalInfo", {
-    value: globalInfo
+const creatorViewer = new CreatorViewerDatas();
+Reflect.defineProperty(window, "creatorViewer", {
+    value: creatorViewer
 })
 
 type CCObjectConstructor = new (...args: any[]) => CCObject;
@@ -267,7 +273,7 @@ interface ITrackPropConfigGroup {
 }
 
 const ReflectForceSetterProps: Map<CCObjectConstructor, ITrackPropConfigGroup> = new Map();
-globalInfo['ReflectForceSetterProps'] = ReflectForceSetterProps;
+creatorViewer['ReflectForceSetterProps'] = ReflectForceSetterProps;
 
 // CCObject 只处理ObjectFlag
 ReflectForceSetterProps.set(CCObject,
@@ -468,7 +474,7 @@ class ViewElementTracker {
             this._name = js.getClassName(elementTarget);
         }
 
-        globalInfo.trackers.set(this._uuid, this);
+        creatorViewer.trackers.set(this._uuid, this);
         const preloadFunc = this._target['_onPreDestroy'];
         const self = this;
         if (preloadFunc) {
@@ -499,10 +505,10 @@ class ViewElementTracker {
             if (js.isChildClassOf(engineClass, Node)) {
                 this._trackPropCopys.set(aliasOrPropKey, {
                     type: 'Node',
-                    value : {
-                        isValid : isValid(originalValue),
-                        nodeName : (originalValue as Node)?.name || "None",
-                        nodeUuid : (originalValue as Node)?.uuid || ""
+                    value: {
+                        isValid: isValid(originalValue),
+                        nodeName: (originalValue as Node)?.name || "None",
+                        nodeUuid: (originalValue as Node)?.uuid || ""
                     } as INodeTypeData,
                     hasSetter: hasSetter
                 })
@@ -511,22 +517,22 @@ class ViewElementTracker {
                 this._trackPropCopys.set(aliasOrPropKey, {
                     type: 'Component',
                     value: {
-                        isValid : isValid(originalValue),
-                        nodeUuid : (originalValue as Component)?.node?.uuid || "",
-                        componentName : js.getClassName(engineClass),
-                        nodeName : (originalValue as Component)?.node?.name || "",
+                        isValid: isValid(originalValue),
+                        nodeUuid: (originalValue as Component)?.node?.uuid || "",
+                        componentName: js.getClassName(engineClass),
+                        nodeName: (originalValue as Component)?.node?.name || "",
                     } as IComponentTypeData,
                     hasSetter: false
                 })
             }
             else if (js.isChildClassOf(engineClass, Asset)) {
                 const assetValue = originalValue as Asset;
-                
+
                 this._trackPropCopys.set(aliasOrPropKey, {
                     type: 'Asset',
                     value: {
-                        className : js.getClassName(engineClass),
-                        assetName : assetValue?.name || ""
+                        className: js.getClassName(engineClass),
+                        assetName: assetValue?.name || ""
                     } as IAssetTypeData,
                     hasSetter: false
                 })
@@ -597,7 +603,7 @@ class ViewElementTracker {
                     this._target[key] = curValue;
                 }
             }
-            else if(prop.type == PROP_EDIT_TYPE.CCOBJECT) {
+            else if (prop.type == PROP_EDIT_TYPE.CCOBJECT) {
                 const curValue = this._target[key];
                 Reflect.defineProperty(this._target, key, prop.original);
                 this._target[key] = curValue;
@@ -625,7 +631,7 @@ class ViewElementTracker {
         Reflect.deleteProperty(this._target, VIEWER_TRACKER);
     }
 
-    protected onPropValueChange(aliasOrKey: string, newValue: any, engineClassType ?: cvSupportType) {
+    protected onPropValueChange(aliasOrKey: string, newValue: any, engineClassType?: cvSupportType) {
         Logger.log(`on prop value change ${aliasOrKey} `, newValue);
         const trackedProp = this._trackPropCopys.get(aliasOrKey);
         if (!trackedProp) {
@@ -647,19 +653,19 @@ class ViewElementTracker {
             }
         }
         else {
-            if(engineClassType == 'Asset') {
+            if (engineClassType == 'Asset') {
                 const value = (trackedProp.value as IAssetTypeData);
                 value.assetName = newValue?.name || "";
                 newValue = value;
             }
-            else if(engineClassType == 'Component') {
+            else if (engineClassType == 'Component') {
                 const value = (trackedProp.value as IComponentTypeData);
                 value.isValid = isValid(newValue);
                 value.nodeUuid = (newValue as Component)?.node?.uuid || "";
                 value.nodeName = (newValue as Component)?.node?.name || "";
                 newValue = value;
             }
-            else if(engineClassType == 'Node') {
+            else if (engineClassType == 'Node') {
                 const value = (trackedProp.value as INodeTypeData);
                 value.isValid = isValid(newValue);
                 value.nodeUuid = (newValue as Component)?.node?.uuid || "";
@@ -671,7 +677,7 @@ class ViewElementTracker {
             }
         }
 
-        globalInfo.bridge.onTrackedPropValueChanged(this._uuid, aliasOrKey, newValue);
+        creatorViewer.bridge.onTrackedPropValueChanged(this._uuid, aliasOrKey, newValue);
     }
 
     modifyTrackProp(propName: string, value: any) {
@@ -740,23 +746,23 @@ class ViewElementTracker {
         }
 
         const engineClass = getCCObjectClassPropTypeMatch(this._target.constructor as CCObjectConstructor, setterKeyAsset, key, Asset) ||
-            getCCObjectClassPropTypeMatch(this._target.constructor as CCObjectConstructor, setterKeyAsset, key, Node) || 
-        getCCObjectClassPropTypeMatch(this._target.constructor as CCObjectConstructor, setterKeyAsset, key, Component);
+            getCCObjectClassPropTypeMatch(this._target.constructor as CCObjectConstructor, setterKeyAsset, key, Node) ||
+            getCCObjectClassPropTypeMatch(this._target.constructor as CCObjectConstructor, setterKeyAsset, key, Component);
 
-        if(engineClass) {
+        if (engineClass) {
             const propDescriptor = getPropertyDescriptor(this._target, key);
             this.recordCCObjectEdit(key, PROP_EDIT_TYPE.CCOBJECT, propDescriptor);
             this.recordPropTrack(key, alias, key, this._target[key], false, engineClass);
             this._targetPropsReplacer[key] = this._target[key];
             const self = this;
-            let engineClassName : cvSupportType;
-            if(js.isChildClassOf(engineClass, Asset)) {
+            let engineClassName: cvSupportType;
+            if (js.isChildClassOf(engineClass, Asset)) {
                 engineClassName = 'Asset';
             }
-            else if(js.isChildClassOf(engineClass, Node)) {
+            else if (js.isChildClassOf(engineClass, Node)) {
                 engineClassName = 'Node';
             }
-            else if(js.isChildClassOf(engineClass, Component)) {
+            else if (js.isChildClassOf(engineClass, Component)) {
                 engineClassName = 'Component';
 
                 console.log(`Prop Track Component`);
@@ -954,7 +960,7 @@ class ViewElementTracker {
     }
 
     unTrack() {
-        globalInfo.trackers.delete(this._uuid);
+        creatorViewer.trackers.delete(this._uuid);
         this.restoreTracker();
     }
 }
@@ -991,12 +997,12 @@ class NodeInfo {
         node.on(Node.EventType.COMPONENT_ADDED, this.onComponentAdd, this);
         node.on(Node.EventType.NODE_DESTROYED, this.onNodeDestroyed, this);
         node.on(Node.EventType.ACTIVE_CHANGED, this.onActiveChanged, this);
-        globalInfo.allNodeInfosMap.set(node.uuid, this);
-        globalInfo.allNodesMap.set(node.uuid, node);
+        creatorViewer.allNodeInfosMap.set(node.uuid, this);
+        creatorViewer.allNodesMap.set(node.uuid, node);
     }
 
     clearListeners() {
-        const node = globalInfo.allNodesMap.get(this.uuid);
+        const node = creatorViewer.allNodesMap.get(this.uuid);
         if (!isValid(node)) return;
         node.targetOff(this);
     }
@@ -1008,19 +1014,19 @@ class NodeInfo {
     protected onActiveChanged(node: Node) {
         if (node.active == this.active) return;
         this.active = node.active;
-        globalInfo.bridge.onNodeActiveChanged(this.uuid, node.active);
+        creatorViewer.bridge.onNodeActiveChanged(this.uuid, node.active);
     }
 
     protected onNodeDestroyed() {
         Logger.log(`on node ${this.name} destroyed`);
-        if (globalInfo.selectedNode === this) {
+        if (creatorViewer.selectedNode === this) {
             this.unSelectNode();
-            globalInfo.selectedNode = undefined;
+            creatorViewer.selectedNode = undefined;
         }
 
-        globalInfo.bridge.onNodeDestroyed(this.uuid);
-        globalInfo.allNodeInfosMap.delete(this.uuid);
-        globalInfo.allNodesMap.delete(this.uuid);
+        creatorViewer.bridge.onNodeDestroyed(this.uuid);
+        creatorViewer.allNodeInfosMap.delete(this.uuid);
+        creatorViewer.allNodesMap.delete(this.uuid);
     }
 
     addChildNodeInfo(nodeInfo: NodeInfo) {
@@ -1038,24 +1044,24 @@ class NodeInfo {
         if (index != -1) {
             this.children.splice(index, 1);
         }
-        globalInfo.bridge.onChildRemove(child.uuid);
+        creatorViewer.bridge.onChildRemove(child.uuid);
     }
 
     protected onChildAdd(child: Node) {
         // Logger.log(new Error().stack);
         Logger.log(`on child add ${child.uuid}    index : ${this._index}`, this);
-        const childInfo = globalInfo.allNodeInfosMap.get(child.uuid) || walkNode(child, this);
+        const childInfo = creatorViewer.allNodeInfosMap.get(child.uuid) || walkNode(child, this);
         this.addChildNodeInfo(childInfo);
 
         // setTimeout(()=>{
         //     globalInfo.bridge.onChildAdd(this.uuid, childInfo);
         // },10);
-        globalInfo.bridge.onChildAdd(this.uuid, childInfo);
+        creatorViewer.bridge.onChildAdd(this.uuid, childInfo);
     }
 
     onChildrenOrderChange() {
         Logger.log(`on children order change`);
-        const selfNode = globalInfo.allNodesMap.get(this.uuid);
+        const selfNode = creatorViewer.allNodesMap.get(this.uuid);
 
         const childrenOrder: Record<string, number> = {};
         selfNode?.children.forEach(node => {
@@ -1067,7 +1073,7 @@ class NodeInfo {
 
         this.children.sort((a, b) => a.siblingIndex - b.siblingIndex);
 
-        globalInfo.bridge.onChildrenOrderChange(this.uuid, childrenOrder);
+        creatorViewer.bridge.onChildrenOrderChange(this.uuid, childrenOrder);
         // globalInfo.bridge.onChildrenOrderChange(this.uuid, childrenOrder);
     }
 
@@ -1077,7 +1083,7 @@ class NodeInfo {
     }
 
     setNodePosition(x: number, y: number, z?: number) {
-        const node = globalInfo.allNodesMap.get(this.uuid);
+        const node = creatorViewer.allNodesMap.get(this.uuid);
         if (!node) return;
         node.setPosition(x, y, z);
     }
@@ -1087,14 +1093,14 @@ class NodeInfo {
     }
 
     get components() {
-        return globalInfo.allNodesMap.get(this.uuid)?.components || [];
+        return creatorViewer.allNodesMap.get(this.uuid)?.components || [];
     }
 
     selectNode() {
-        globalInfo.selectedNode?.unSelectNode();
-        globalInfo.selectedNode = this;
+        creatorViewer.selectedNode?.unSelectNode();
+        creatorViewer.selectedNode = this;
         const trackers: ViewElementTracker[] = [];
-        trackers.push(ViewElementTracker.trackTarget(globalInfo.allNodesMap.get(this.uuid)));
+        trackers.push(ViewElementTracker.trackTarget(creatorViewer.allNodesMap.get(this.uuid)));
         this.components.forEach(comp => {
             trackers.push(ViewElementTracker.trackTarget(comp));
         })
@@ -1105,7 +1111,7 @@ class NodeInfo {
         this.components.forEach(comp => {
             ViewElementTracker.unTrackTarget(comp);
         });
-        ViewElementTracker.unTrackTarget(globalInfo.allNodesMap.get(this.uuid));
+        ViewElementTracker.unTrackTarget(creatorViewer.allNodesMap.get(this.uuid));
     }
 
     getChildByPath(path: string) {
@@ -1124,10 +1130,16 @@ class NodeInfo {
     }
 }
 
-function walkNode(node: Node, parent?: NodeInfo) {
-    if (globalInfo.allNodeInfosMap.has(node.uuid)) {
+/**
+ * 遍历节点并生成节点信息
+ * @param node 节点或场景
+ * @param parent 父节点信息
+ * @returns 
+ */
+function walkNode(node: Node | Scene, parent?: NodeInfo) {
+    if (creatorViewer.allNodeInfosMap.has(node.uuid)) {
         Logger.log(`walk same node`);
-        return globalInfo.allNodeInfosMap.get(node.uuid);
+        return creatorViewer.allNodeInfosMap.get(node.uuid);
     }
     const nodeInfo = new NodeInfo(node);
     nodeInfo.name = node.name;
@@ -1136,6 +1148,560 @@ function walkNode(node: Node, parent?: NodeInfo) {
     nodeInfo.active = node.active;
     node.children.forEach(child => nodeInfo.addChildNodeInfo(walkNode(child, nodeInfo)));
     return nodeInfo;
+}
+
+enum FloatingActionButtonEvent {
+    ON_FLOATING_ACTION_BUTTON_CLICK = "ON_FLOATING_ACTION_BUTTON_CLICK",
+}
+
+class FloatingContent extends Component {
+    protected _floatingSpeed = 15;
+    protected _alignSpeed = 3;
+    protected _minMoveDistance = 10;
+
+    protected _floatingContent: Node;
+    protected _containerContentSize: Size;
+    protected _floatingContentOffset: Vec2 = Vec2.ZERO.clone();
+
+    protected _touchStartPosition: Vec3 = Vec3.ZERO.clone();
+    protected _touchTargetPosition: Vec2 = Vec2.ZERO.clone();
+
+    protected _isTouchingButtonMove: boolean = false;
+    protected _isTouching: boolean = false;
+
+    protected onLoad(): void {
+        this.node.on(Node.EventType.TOUCH_START, this.onTouchStart, this);
+        this.node.on(Node.EventType.TOUCH_MOVE, this.onTouchMove, this);
+        this.node.on(Node.EventType.TOUCH_CANCEL, this.onTouchEnd, this);
+        this.node.on(Node.EventType.TOUCH_END, this.onTouchEnd, this);
+    }
+
+    protected onTouchStart(event: EventTouch) {
+        this._isTouchingButtonMove = false;
+        this._isTouching = true;
+        if (!this._floatingContent) return;
+        this._touchStartPosition.set(this._floatingContent.position.clone());
+    }
+
+    protected onTouchMove(event: EventTouch) {
+        let offset = event.getUILocation().clone().subtract(event.getUIStartLocation());
+        this._touchTargetPosition.set(this._touchStartPosition.x + offset.x, this._touchStartPosition.y + offset.y);
+        if (!this._isTouchingButtonMove) {
+            if (Vec2.distance(event.getUILocation(), event.getUIStartLocation()) >= this._minMoveDistance) {
+                this._isTouchingButtonMove = true;
+            }
+        }
+        else {
+            this.fixContentPosition(this._touchTargetPosition);
+        }
+    }
+
+    protected onTouchEnd(event: EventTouch) {
+        this._isTouchingButtonMove = false;
+        this._isTouching = false;
+    }
+
+    setContainerContent(node: Node) {
+        const uiTransform = node.getComponent(UITransform);
+        this._containerContentSize = uiTransform.contentSize.clone();
+        this.refreshContainerSize();
+    }
+
+    setFloatingContent(node: Node) {
+        this._floatingContent = node;
+        const offset = node.worldPosition.subtract(this.node.worldPosition);
+        this._floatingContentOffset.set(offset.x, offset.y);
+        this.refreshContainerSize();
+    }
+
+    protected refreshContainerSize() {
+        if (!this._containerContentSize || !this._floatingContent) return;
+        const uiTransform = this._floatingContent.getComponent(UITransform);
+        this._containerContentSize.width -= uiTransform.width;
+        this._containerContentSize.height -= uiTransform.height;
+    }
+
+    protected fixContentPosition(targetPosition: Vec2) {
+        if (!this._containerContentSize) return;
+
+        if (targetPosition.x > this._containerContentSize.width / 2) {
+            targetPosition.x = this._containerContentSize.width / 2;
+        }
+        else if (targetPosition.x < -this._containerContentSize.width / 2) {
+            targetPosition.x = -this._containerContentSize.width / 2;
+        }
+
+        if (targetPosition.y > this._containerContentSize.height / 2) {
+            targetPosition.y = this._containerContentSize.height / 2;
+        }
+        else if (targetPosition.y < -this._containerContentSize.height / 2) {
+            targetPosition.y = -this._containerContentSize.height / 2;
+        }
+    }
+
+    protected update(deltaTime: number) {
+        if (this._isTouchingButtonMove && this._floatingContent) {
+            let pos = v2(this._floatingContent.position.x, this._floatingContent.position.y);
+            pos.lerp(this._touchTargetPosition, deltaTime * this._floatingSpeed);
+            this._floatingContent.setPosition(pos.x, pos.y);
+        }
+    }
+}
+
+class FloatingActionButton extends Component {
+    static EventType = FloatingActionButtonEvent;
+
+    protected clickCheckElapse = 0.3;
+    protected _idleOpacity = 100;
+    protected _floatingSpeed = 15;
+    protected _alignSpeed = 3;
+    protected _minMoveDistance = 10;
+    protected _continuousClickTimes: number = 0;
+
+    protected _isTouchingButtonMove: boolean = false;
+    protected _isTouching: boolean = false;
+    protected _isAlignMoving: boolean = false;
+    protected _parentSize: Size = Size.ZERO.clone();
+
+    protected _touchStartPosition: Vec3 = Vec3.ZERO.clone();
+    protected _touchTargetPosition: Vec2 = Vec2.ZERO.clone();
+    protected _opacityComp: UIOpacity;
+    protected _fadingTween: Tween<UIOpacity>;
+
+    protected onLoad(): void {
+        this.node.on(Node.EventType.TOUCH_START, this.onTouchStart, this);
+        this.node.on(Node.EventType.TOUCH_MOVE, this.onTouchMove, this);
+        this.node.on(Node.EventType.TOUCH_CANCEL, this.onTouchEnd, this);
+        this.node.on(Node.EventType.TOUCH_END, this.onTouchEnd, this);
+
+        this._opacityComp = this.node.getComponent(UIOpacity) || this.node.addComponent(UIOpacity);
+        this._opacityComp.opacity = 1;
+    }
+
+    start() {
+        this.scheduleOnce(() => {
+            let buttonSize = this.getComponent(UITransform).contentSize;
+            let nodeSize = this.node.parent.getComponent(UITransform).contentSize;
+            this._parentSize.set(nodeSize.width - buttonSize.width, nodeSize.height - buttonSize.height);
+            this.checkAlign();
+            this.node.setPosition(this._touchTargetPosition.x, this._touchTargetPosition.y);
+            this._opacityComp.opacity = this._idleOpacity;
+        })
+    }
+
+    protected onTouchTimeOut() {
+        this.node.emit(FloatingActionButtonEvent.ON_FLOATING_ACTION_BUTTON_CLICK, this._continuousClickTimes);
+        this._continuousClickTimes = 0;
+    }
+
+    protected onTouchStart(event: EventTouch) {
+        Tween.stopAllByTarget(this._opacityComp);
+        this._isTouchingButtonMove = false;
+        this._isTouching = true;
+        this._touchStartPosition.set(this.node.position);
+        this.unschedule(this.onTouchTimeOut);
+        this._continuousClickTimes++;
+        this._opacityComp.opacity = 255;
+    }
+
+    protected onTouchMove(event: EventTouch) {
+        let offset = event.getUILocation().clone().subtract(event.getUIStartLocation());
+        this._touchTargetPosition.set(this._touchStartPosition.x + offset.x, this._touchStartPosition.y + offset.y);
+        if (!this._isTouchingButtonMove) {
+            if (Vec2.distance(event.getUILocation(), event.getUIStartLocation()) >= this._minMoveDistance) {
+                this._isTouchingButtonMove = true;
+                this._continuousClickTimes = 0;
+            }
+        }
+        else {
+            this.calTargetPosition(this._touchTargetPosition);
+        }
+    }
+
+    protected calTargetPosition(targetPosition: Vec2) {
+        if (targetPosition.x > this._parentSize.width / 2) {
+            targetPosition.x = this._parentSize.width / 2;
+        }
+        else if (targetPosition.x < -this._parentSize.width / 2) {
+            targetPosition.x = -this._parentSize.width / 2;
+        }
+
+        if (targetPosition.y > this._parentSize.height / 2) {
+            targetPosition.y = this._parentSize.height / 2;
+        }
+        else if (targetPosition.y < -this._parentSize.height / 2) {
+            targetPosition.y = -this._parentSize.height / 2;
+        }
+    }
+
+    protected onTouchEnd(event: EventTouch) {
+        if (!this._isTouchingButtonMove) {
+            this.scheduleOnce(this.onTouchTimeOut, this.clickCheckElapse);
+        }
+
+        if (this._isTouchingButtonMove) {
+            let offset = event.getUILocation().clone().subtract(event.getUIStartLocation());
+            this.checkAlign(v3(this._touchStartPosition.x + offset.x, this._touchStartPosition.y + offset.y));
+        }
+        this._isTouchingButtonMove = false;
+        this._isTouching = false;
+
+
+        this._fadingTween = tween(this._opacityComp).delay(0.4).to(0.2, { opacity: this._idleOpacity }).start();
+    }
+
+    protected checkAlign(pos?: Vec3) {
+        pos = pos || this.node.position;
+        let leftPadding = pos.x + this._parentSize.width / 2;
+        let rightPadding = this._parentSize.width / 2 - pos.x;
+        let topPadding = this._parentSize.height / 2 - pos.y;
+        let bottomPadding = pos.y + this._parentSize.height / 2;
+        let targetX = 0;
+        let targetY = 0;
+        let xMoveSpace = 0;
+        let yMoveSpace = 0;
+
+        if (leftPadding > rightPadding) {
+            xMoveSpace = rightPadding;
+            targetX = this._parentSize.width / 2;
+        }
+        else {
+            xMoveSpace = leftPadding;
+            targetX = -this._parentSize.width / 2;
+        }
+
+        if (topPadding > bottomPadding) {
+            yMoveSpace = bottomPadding;
+            targetY = -this._parentSize.height / 2;
+        }
+        else {
+            yMoveSpace = topPadding;
+            targetY = this._parentSize.height / 2;
+        }
+
+        if (xMoveSpace > yMoveSpace) {
+            this._touchTargetPosition.set(pos.x, targetY);
+        }
+        else {
+            this._touchTargetPosition.set(targetX, pos.y);
+        }
+
+        if (!this.isAlignToTarget()) {
+            this._isAlignMoving = true;
+        }
+    }
+
+    protected isAlignToTarget() {
+        return Math.abs(this._touchTargetPosition.x - this.node.position.x) < 2 && Math.abs(this._touchTargetPosition.y - this.node.position.y) < 2;
+    }
+
+    protected update(deltaTime: number) {
+        if (this._isTouchingButtonMove) {
+            let pos = v2(this.node.position.x, this.node.position.y);
+            pos.lerp(this._touchTargetPosition, deltaTime * this._floatingSpeed);
+            this.node.setPosition(pos.x, pos.y);
+        }
+        else {
+            if (!this._isTouching && this._isAlignMoving) {
+                let pos = v2(this.node.position.x, this.node.position.y);
+                pos.lerp(this._touchTargetPosition, deltaTime * this._alignSpeed);
+                this.node.setPosition(pos.x, pos.y);
+                if (this.isAlignToTarget()) {
+                    this._isAlignMoving = false;
+                }
+            }
+        }
+    }
+}
+
+function createEditBox(width: number, height: number, maxLength: number = 32, fontSize: number = 26, placeHolder: string = "place holder", nodeName?: string): [Node, EditBox] {
+    const bgNode = createPanel(width, height, undefined, 6, 2);
+    const editNode = new Node(nodeName);
+    bgNode.addChild(editNode);
+    const editComp = editNode.addComponent(EditBox);
+
+    const editWidth = width - 4;
+    const editHeight = height - 4;
+    editNode.getComponent(UITransform).setContentSize(editWidth, editHeight);
+    editComp.inputMode = EditBox.InputMode.SINGLE_LINE;
+    editComp.maxLength = maxLength;
+    editComp.placeholder = placeHolder;
+
+    function adjustEditLabel(label: Label, color: Color) {
+        label.overflow = Overflow.CLAMP;
+        label.getComponent(UITransform).setContentSize(editWidth, editHeight);
+        label.horizontalAlign = HorizontalTextAlignment.LEFT;
+        label.node.setPosition(0, 0);
+        label.color = color;
+        label.fontSize = fontSize;
+        label.lineHeight = fontSize;
+    }
+
+    editComp.scheduleOnce(() => {
+        adjustEditLabel(editComp.placeholderLabel, Color.GRAY);
+        adjustEditLabel(editComp.textLabel, Color.BLACK);
+    })
+
+    return [bgNode, editComp];
+}
+
+/**
+ * 创建按钮 
+ * @param width 按钮宽度
+ * @param height 按钮高度
+ * @param buttonText 按钮文本
+ * @param color 背景色
+ * @param borderColor 边框颜色
+ * @param textColor 文本颜色
+ * @param textFontSize 文本字体大小
+ * @returns 
+ */
+function createButton(width: number, height: number, buttonText: string = "Button", color: Color = Color.WHITE, borderColor: Color = Color.BLACK, textColor: Color = Color.BLACK, textFontSize: number = 26, borderSize: number = 2) {
+    const bgNode = createPanel(width, height, color, 6, borderSize, borderColor);
+
+    const buttonComp = bgNode.addComponent(Button);
+    buttonComp.transition = Button.Transition.SCALE;
+    buttonComp.zoomScale = 1.1;
+    const labelNode = new Node("Label");
+    bgNode.addChild(labelNode);
+    const labelComp = labelNode.addComponent(Label);
+    labelComp.string = buttonText;
+    labelComp.color = textColor;
+    labelComp.fontSize = textFontSize;
+    labelComp.lineHeight = textFontSize;
+    labelComp.isBold = true;
+
+    return bgNode;
+}
+
+/**
+ * 绘制一个面板
+ * @param width 面板宽度
+ * @param height 面板高度
+ * @param color 背景颜色
+ * @param roundRadius 圆角半径
+ * @param borderSize 边框宽度（0为没有边框）
+ * @param borderColor 边框颜色
+ * @returns 
+ */
+function createPanel(width: number, height: number, color: Color = Color.WHITE, roundRadius: number = 0, borderSize: number = 0, borderColor: Color = Color.BLACK) {
+    const node = new Node();
+    const graphicsComp = node.addComponent(Graphics);
+    if (borderSize > 0) {
+        const borderWidth = width + borderSize * 2;
+        const borderHeight = height + borderSize * 2;
+
+        graphicsComp.roundRect(-borderWidth / 2, -borderHeight / 2, borderWidth, borderHeight, roundRadius);
+        graphicsComp.fillColor = borderColor;
+        graphicsComp.fill();
+    }
+    graphicsComp.roundRect(-width / 2, -height / 2, width, height, roundRadius);
+    graphicsComp.fillColor = color;
+    graphicsComp.fill();
+
+    node.getComponent(UITransform).setContentSize(width + borderSize * 2, height + borderSize * 2);
+
+    return node;
+}
+
+function createLabel(name: string, fontSize: number, fontColor: Color = Color.BLACK, outlineWidth: number = 0, outlineColor: Color = Color.BLACK, anchorPoint: Vec2 = v2(0.5, 0.5)) {
+    const labelComp = new Node(name).addComponent(Label);
+    labelComp.fontSize = fontSize;
+    labelComp.lineHeight = fontSize;
+    labelComp.color = fontColor;
+    if (outlineWidth > 0) {
+        labelComp.enableOutline = true;
+        labelComp.outlineWidth = outlineWidth;
+        labelComp.outlineColor = outlineColor;
+    }
+    labelComp.getComponent(UITransform).setAnchorPoint(anchorPoint);
+
+    return labelComp;
+}
+
+function createCircleNode(name: string, radius: number, color: Color) {
+    const graphicsComp = new Node(name).addComponent(Graphics);
+    graphicsComp.circle(0, 0, radius);
+    graphicsComp.fillColor = color;
+    graphicsComp.fill();
+
+    return graphicsComp.node;
+}
+
+interface IPanelStyleConfig {
+    size: Size;
+    backgroundColor: Color;
+    backgroundBorderWidth: number;
+    backgroundRadius: number;
+    padding: number;
+
+    titleBackgroundColor: Color;
+    titleHeight: number;
+    titleBackgroundRadius: number;
+    titleFontSize: number;
+
+    controlsBackgroundColor: Color;
+    constolsBackgroundRadius: number;
+
+    propertyFontSize: number;
+}
+
+const PanelDefaultStyle: IPanelStyleConfig = {
+    size: size(500, 200),
+    backgroundColor: new Color("#ffffffff"),
+    backgroundBorderWidth: 3,
+    backgroundRadius: 6,
+    padding: 3,
+
+    titleBackgroundColor: new Color("#a7b6d3ff"),
+    titleHeight: 35,
+    titleBackgroundRadius: 6,
+    titleFontSize: 14,
+
+    controlsBackgroundColor: new Color("#d3ddefff"),
+    constolsBackgroundRadius: 6,
+
+    propertyFontSize: 14
+}
+
+enum CreatorViewerConnectedStated {
+    FREE,
+    CONNECTING,
+    ERROR,
+    KICKED,
+}
+
+enum CreatorViewerStorageKeys {
+    /**  */
+    CREATOR_VIEWER_TEMP_SERVER = "CREATOR_VIEWER_TEMP_SERVER",
+}
+
+function getCreatorViewerStorageData<T>(key: CreatorViewerStorageKeys, defaultValue: T) {
+    const value = sys.localStorage.getItem(key);
+    if (value == null) return defaultValue;
+    return value;
+}
+
+function checkTouchNode() {
+    
+}
+
+
+/** CreatorViewer面板（因为不引用外部的预制体及资源所以需要使用的控件和面板都手动创建） */
+class CreatorViewerPanel extends Component {
+    protected _titleContent: Node;
+    protected _controlsContent: Node;
+
+    protected _serverAddressEditBox: EditBox;
+    protected _connectButton: Button;
+    protected _cancelConnectButton: Button;
+    protected _stateGraphics: Graphics;
+
+    protected onLoad(): void {
+        this.node.name = "CreatorViewerPanel";
+        const maskNode = createPanel(5000, 5000, new Color(123, 123, 123, 120), 0, 0);
+        maskNode.addComponent(BlockInputEvents);
+        maskNode.addComponent(Button);
+        maskNode.on(Button.EventType.CLICK, this.hidePanel, this);
+        this.node.addChild(maskNode);
+        this.createPanel(PanelDefaultStyle);
+    }
+
+    protected hidePanel() {
+        this.node.active = false;
+    }
+
+    protected createPanel(style: IPanelStyleConfig) {
+        const uiTransform = this.getComponent(UITransform) || this.addComponent(UITransform);
+        uiTransform.setContentSize(style.size);
+
+        const background = createPanel(style.size.width, style.size.height, style.backgroundColor, style.backgroundRadius, style.backgroundBorderWidth);
+        background.addComponent(BlockInputEvents);
+        this.node.addChild(background);
+
+        this._titleContent = createPanel(style.size.width - style.padding * 2, style.titleHeight, style.titleBackgroundColor, style.titleBackgroundRadius);
+        background.addChild(this._titleContent);
+        this._titleContent.setPosition(0, style.size.height / 2 - style.titleHeight / 2 - style.padding);
+
+        this._controlsContent = createPanel(style.size.width - style.padding * 2, style.size.height - style.titleHeight - style.padding * 3, style.controlsBackgroundColor, style.constolsBackgroundRadius);
+        background.addChild(this._controlsContent);
+        this._controlsContent.setPosition(0, -style.size.height / 2 + (style.size.height - style.titleHeight - style.padding * 3) / 2 + style.padding);
+        this.createControls(style);
+
+        this.scheduleOnce(() => {
+            const floatingContent = this._titleContent.addComponent(FloatingContent);
+            floatingContent.setFloatingContent(this.node);
+            floatingContent.setContainerContent(this.node.parent);
+        }, 0.1);
+    }
+
+    protected createControls(style: IPanelStyleConfig) {
+        const titleLabel = createLabel("TilteLabel", style.titleFontSize, Color.WHITE, 2, Color.BLACK, v2(0, 0.5));
+        titleLabel.node.setPosition(-this._titleContent.getComponent(UITransform).width / 2 + 3, 0);
+        titleLabel.string = "CreatorViewer 1.0";
+        this._titleContent.addChild(titleLabel.node);
+
+        const stateCircleBg = createCircleNode("Connection State", 10, Color.BLACK);
+        this._titleContent.addChild(stateCircleBg);
+
+        const stateCircle = createCircleNode("Connection State", 8, Color.GRAY);
+        this._stateGraphics = stateCircle.getComponent(Graphics);
+        stateCircleBg.addChild(stateCircle);
+
+
+        const connectButton = createButton(60, 28, "连接", new Color('#7ED56D'), undefined, new Color("#0B4600"), 14, 2);
+        this._connectButton = connectButton.getComponent(Button);
+        connectButton.on(Button.EventType.CLICK, this.onClickConnect, this);
+        this._controlsContent.addChild(connectButton);
+
+        const cancelConnectButton = createButton(60, 28, "取消", new Color('#ebb66bff'), undefined, new Color("#764909ff"), 14, 2);
+        this._cancelConnectButton = cancelConnectButton.getComponent(Button);
+        cancelConnectButton.on(Button.EventType.CLICK, this.onClickCancel, this);
+        this._cancelConnectButton.node.active = false;
+
+
+        const [serverEditBoxNode, serverEditBox] = createEditBox(220, 30, 256, 16, "输入CreatorViewer服务地址");
+        serverEditBox.string = getCreatorViewerStorageData(CreatorViewerStorageKeys.CREATOR_VIEWER_TEMP_SERVER, '127.0.0.1:33000');
+        this._serverAddressEditBox = serverEditBox;
+
+        const connectionLayout = new Node("ConnectionLayout").addComponent(Layout);
+        connectionLayout.getComponent(UITransform).setAnchorPoint(0, 0.5);
+        connectionLayout.type = Layout.Type.HORIZONTAL;
+        connectionLayout.resizeMode = Layout.ResizeMode.CONTAINER;
+        connectionLayout.spacingX = 5;
+
+        const connectionLabel = createLabel("Label", style.propertyFontSize, Color.WHITE, 2, Color.BLACK, v2(0, 0.5));
+        connectionLabel.string = "服务地址：";
+        connectionLayout.node.addChild(connectionLabel.node);
+        connectionLayout.node.addChild(serverEditBoxNode);
+        connectionLayout.node.addChild(connectButton);
+        connectionLayout.node.addChild(cancelConnectButton);
+        connectionLayout.getComponent(UITransform).height = 30;
+        const widget = connectionLayout.addComponent(Widget);
+        widget.isAlignLeft = widget.isAlignTop = true;
+        widget.left = 10;
+        widget.top = 5;
+
+        this._controlsContent.addChild(connectionLayout.node);
+    }
+
+    protected changeState() {
+        this._stateGraphics.fillColor = new Color("#ebb66bff");
+        this._stateGraphics.fill();
+    }
+
+    protected onClickConnect() {
+        creatorViewer.bridge.connect(this._serverAddressEditBox.string);
+        this._connectButton.node.active = false;
+        this._cancelConnectButton.node.active = true;
+        this.changeState();
+    }
+
+    protected onClickCancel() {
+        creatorViewer.bridge.close();
+        this._connectButton.node.active = true;
+        this._cancelConnectButton.node.active = false;
+    }
 }
 
 if (!EDITOR) {
@@ -1148,8 +1714,8 @@ if (!EDITOR) {
             Reflect.defineProperty(Node.prototype, 'name', {
                 set(value: string) {
                     const uuid = this.uuid;
-                    if (globalInfo.allNodeInfosMap.has(uuid)) {
-                        const nodeInfo = globalInfo.allNodeInfosMap.get(uuid);
+                    if (creatorViewer.allNodeInfosMap.has(uuid)) {
+                        const nodeInfo = creatorViewer.allNodeInfosMap.get(uuid);
                         nodeInfo.onNodeNameChange(value);
                     }
                     // 用 Reflect.apply 来调用原始 setter
@@ -1165,87 +1731,49 @@ if (!EDITOR) {
     patchNode();
 
     director.on(Director.EVENT_BEFORE_SCENE_LOADING, (scene: Scene) => {
-        globalInfo.allNodeInfosMap.forEach(nodeInfo => nodeInfo.clearListeners());
-        globalInfo.allNodesMap.clear();
-        globalInfo.allNodeInfosMap.clear();
-        globalInfo.trackers.forEach(tracker => tracker.unTrack());
-        globalInfo.selectedNode = undefined;
+        creatorViewer.allNodeInfosMap.forEach(nodeInfo => nodeInfo.clearListeners());
+        creatorViewer.allNodesMap.clear();
+        creatorViewer.allNodeInfosMap.clear();
+        creatorViewer.trackers.forEach(tracker => tracker.unTrack());
+        creatorViewer.selectedNode = undefined;
     })
 
     director.on(Director.EVENT_AFTER_SCENE_LAUNCH, (scene: Scene) => {
-        globalInfo.allNodeInfosMap.forEach(nodeInfo => nodeInfo.clearListeners());
-        globalInfo.allNodesMap.clear();
-        globalInfo.allNodeInfosMap.clear();
-        globalInfo.sceneTree = walkNode(scene);
-        globalInfo.bridge.syncScene();
+        creatorViewer.allNodeInfosMap.forEach(nodeInfo => nodeInfo.clearListeners());
+        creatorViewer.allNodesMap.clear();
+        creatorViewer.allNodeInfosMap.clear();
+        creatorViewer.sceneTree = walkNode(scene);
+        creatorViewer.bridge.syncScene();
     })
 
-    game.on(Game.EVENT_GAME_INITED, () => { globalInfo.bridge.connect() });
-
-    function drawRoundedRect(g: Graphics, x: number, y: number, w: number, h: number, r: number) {
-        g.moveTo(x + r, y);
-        g.roundRect(x, y, w, h,r);
-    }
-
+    /** 创建前端面板（用于连接和部分客户端开关用） */
     function createCreatorViewDebugLayer() {
-
-        const width = 8;
-        const height = 8;
-
-        // 创建纯白像素数据
-        const whitePixel = new Uint8Array(width * height * 4);
-        for (let i = 0; i < whitePixel.length; i += 4) {
-            whitePixel[i] = 255;     // R
-            whitePixel[i + 1] = 255; // G
-            whitePixel[i + 2] = 255; // B
-            whitePixel[i + 3] = 255; // A
-        }
-
-        // 创建 Texture2D
-        const texture = new Texture2D();
-        texture.reset({
-            width,
-            height,
-            format: Texture2D.PixelFormat.RGBA8888,
-        });
-        texture.uploadData(whitePixel); 
-
-        // 创建 SpriteFrame
-        const spriteFrame = new SpriteFrame();
-        spriteFrame.texture = texture;
-
-        // 创建节点并添加组件
-        const node = new Node('WhiteSprite');
-        const sprite = node.addComponent(Sprite);
-        sprite.spriteFrame = spriteFrame;
-
-        // 设置尺寸
-        const uiTransform = node.getComponent(UITransform);
-        uiTransform.setContentSize(100, 100); // 你想要的宽高
-
-
-        // setTimeout(()=>{
-        //     director.getScene().getChildByName("Canvas").addChild(node);
-        // }, 3000);
         // 添加到场景中
         const canvasNode = new Node();
+        creatorViewer.bridge = canvasNode.addComponent(ViewBridgeBase);
         const widget = canvasNode.addComponent(Widget);
         canvasNode.addComponent(Canvas);
         widget.isAlignBottom = widget.isAlignTop = widget.isAlignLeft = widget.isAlignRight = true;
         widget.bottom = widget.top = widget.left = widget.right = 0;
         director.addPersistRootNode(canvasNode);
 
-        const graphicsNode = new Node();
-        const graphicsComp = graphicsNode.addComponent(Graphics);
-        drawRoundedRect(graphicsComp, 0, 0, 200, 60, 10);
-        graphicsComp.fillColor = Color.YELLOW;
-        graphicsComp.fill();
-        canvasNode.addChild(graphicsNode);
-        const edit = graphicsNode.addComponent(EditBox);
-        edit.inputMode = EditBox.InputMode.SINGLE_LINE;
-        const inputLabel = graphicsNode.getChildByName('TEXT_LABEL').getComponent(Label);
-        inputLabel.fontSize = 26;
-        inputLabel.color = Color.BLACK;
+        const floatingBar = new Node();
+        floatingBar.addComponent(UITransform).setContentSize(100, 100);
+        floatingBar.addComponent(FloatingActionButton);
+        canvasNode.addChild(floatingBar);
+
+        const floatingBarLabel = new Node().addComponent(Label);
+        floatingBar.addChild(floatingBarLabel.node);
+        floatingBarLabel.string = "👹";
+        floatingBar.on(FloatingActionButton.EventType.ON_FLOATING_ACTION_BUTTON_CLICK, () => {
+            panelNode.active = !panelNode.active;
+        })
+
+        const panelNode = new Node();
+        panelNode.addComponent(CreatorViewerPanel);
+        canvasNode.addChild(panelNode);
+        panelNode.active = false;
     }
+
     createCreatorViewDebugLayer();
 }
