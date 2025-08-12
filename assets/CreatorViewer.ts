@@ -92,7 +92,7 @@ export class ViewBridgeBase extends Component {
         }
     }
 
-    close(mannual : boolean = false) {
+    close(mannual: boolean = false) {
         this.unschedule(this.reconnect);
         this._connected = false;
         if (this._websocket) {
@@ -160,6 +160,13 @@ export class ViewBridgeBase extends Component {
                     }
                 }
                     break;
+                case 'print_target_by_uuid' : {
+                    const tracker = creatorViewer.trackers.get(data.data.targetUuid);
+                    if(tracker) {
+                        console.log(tracker._target);
+                    }
+                }
+                break;
             }
         } catch (error) {
             console.error(error);
@@ -446,7 +453,7 @@ class ViewElementTracker {
         tracker.unTrack();
     }
 
-    protected _target: Node | Component;
+    _target: Node | Component;
 
     /** 被追踪的属性记录 */
     protected _trackedPropsMap: Map<string, IPropEditRecordItem> = new Map();
@@ -1582,8 +1589,45 @@ function getCreatorViewerStorageData<T>(key: CreatorViewerStorageKeys, defaultVa
     return value;
 }
 
-function checkTouchNode() {
-    
+const selectNodeQueue: Node[] = [];
+const curSelectedNodeQueue: Node[] = [];
+let curSelectedFirstItem: Node;
+
+function walkUINodeContect(node: Node, uiLocation: Vec2) {
+    // if(!node._uiProps?.uiTransformComp) return;
+
+    for (let index = node.children.length - 1; index >= 0; index--) {
+        const child = node.children[index];
+        if (!child.activeInHierarchy) continue;
+        if (!child._uiProps?.uiTransformComp) continue;
+
+        const subChild = walkUINodeContect(child, uiLocation);
+        if (subChild) return subChild;
+        if (child._uiProps?.uiTransformComp.hitTest(uiLocation)) {
+            curSelectedNodeQueue.push(child);
+            if (!curSelectedFirstItem) curSelectedFirstItem = child;
+            if (!selectNodeQueue.includes(child)) {
+                return child;
+            }
+        }
+    }
+}
+
+function checkTouchNode(touchEvent: EventTouch) {
+    curSelectedFirstItem = undefined;
+    curSelectedNodeQueue.length = 0;
+    const selectNode = walkUINodeContect(director.getScene(), touchEvent.getLocation());
+    if (selectNode) {
+        console.log(`selectNode`, selectNode);
+        selectNodeQueue.push(selectNode);
+    }
+    else {
+        selectNodeQueue.length = 0;
+        if (curSelectedFirstItem) {
+            console.log(`selectNode `, curSelectedFirstItem);
+            selectNodeQueue.push(curSelectedFirstItem);
+        }
+    }
 }
 
 
@@ -1756,6 +1800,30 @@ if (!EDITOR) {
         widget.isAlignBottom = widget.isAlignTop = widget.isAlignLeft = widget.isAlignRight = true;
         widget.bottom = widget.top = widget.left = widget.right = 0;
         director.addPersistRootNode(canvasNode);
+
+        const touchCheckNode = new Node();
+        const touchWidget = touchCheckNode.addComponent(Widget);
+        touchWidget.isAlignBottom = touchWidget.isAlignTop = touchWidget.isAlignLeft = touchWidget.isAlignRight = true;
+        touchWidget.bottom = touchWidget.top = touchWidget.left = touchWidget.right = 0;
+        // canvasNode.addChild(touchCheckNode);
+        touchCheckNode.on(Node.EventType.TOUCH_START, (event: EventTouch) => {
+            // event.preventSwallow = true;
+            checkTouchNode(event);
+        });
+
+        touchCheckNode.on(Node.EventType.TOUCH_MOVE, (event: EventTouch) => {
+            // event.preventSwallow = true;
+        });
+
+        touchCheckNode.on(Node.EventType.TOUCH_END, (event: EventTouch) => {
+            // event.preventSwallow = true;
+        });
+
+        touchCheckNode.on(Node.EventType.TOUCH_CANCEL, (event: EventTouch) => {
+            // event.preventSwallow = true;
+        });
+
+
 
         const floatingBar = new Node();
         floatingBar.addComponent(UITransform).setContentSize(100, 100);
