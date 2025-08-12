@@ -1,4 +1,4 @@
-import { _decorator, Asset, BlockInputEvents, Button, Canvas, CCObject, Color, Component, Director, director, EditBox, EventTouch, gfx, Graphics, HorizontalTextAlignment, isValid, js, Label, Layout, Node, Overflow, Rect, Scene, size, Size, Sprite, sys, tween, Tween, UIOpacity, UIRenderer, UITransform, v2, v3, ValueType, Vec2, Vec3, Vec4, Widget } from 'cc';
+import { _decorator, Asset, BlockInputEvents, Button, Canvas, CCObject, Color, Component, Director, director, EditBox, EventTouch, gfx, Graphics, HorizontalTextAlignment, isValid, js, Label, Layout, Node, Overflow, Rect, Scene, size, Size, Sprite, sys, Toggle, tween, Tween, UIOpacity, UIRenderer, UITransform, v2, v3, ValueType, Vec2, Vec3, Vec4, Widget } from 'cc';
 import { EDITOR } from 'cc/env';
 
 const { ccclass, property, requireComponent } = _decorator;
@@ -160,13 +160,13 @@ export class ViewBridgeBase extends Component {
                     }
                 }
                     break;
-                case 'print_target_by_uuid' : {
+                case 'print_target_by_uuid': {
                     const tracker = creatorViewer.trackers.get(data.data.targetUuid);
-                    if(tracker) {
+                    if (tracker) {
                         console.log(tracker._target);
                     }
                 }
-                break;
+                    break;
             }
         } catch (error) {
             console.error(error);
@@ -215,6 +215,10 @@ export class ViewBridgeBase extends Component {
 
     onTrackedPropValueChanged(targetUuid: string, propName: string, newValue: any) {
         this.sendData({ type: 'on_tracked_prop_change', data: { targetUuid: targetUuid, propName: propName, newValue: newValue } });
+    }
+
+    selectNodeByUuid(targetUuid : string) {
+        this.sendData({ type: 'on_node_selected_by_viewer', data: { targetUuid: targetUuid}});
     }
 }
 
@@ -1511,6 +1515,16 @@ function createPanel(width: number, height: number, color: Color = Color.WHITE, 
     return node;
 }
 
+/**
+ * 创建一个Label
+ * @param name 节点名称
+ * @param fontSize 字体大小
+ * @param fontColor 文本颜色
+ * @param outlineWidth 描边宽度
+ * @param outlineColor 描边颜色
+ * @param anchorPoint 锚点
+ * @returns 
+ */
 function createLabel(name: string, fontSize: number, fontColor: Color = Color.BLACK, outlineWidth: number = 0, outlineColor: Color = Color.BLACK, anchorPoint: Vec2 = v2(0.5, 0.5)) {
     const labelComp = new Node(name).addComponent(Label);
     labelComp.fontSize = fontSize;
@@ -1533,6 +1547,48 @@ function createCircleNode(name: string, radius: number, color: Color) {
     graphicsComp.fill();
 
     return graphicsComp.node;
+}
+
+/**
+ * 创建一个CheckBox
+ * @param text 
+ * @param width 
+ * @param height 
+ * @param checkMarkSize 
+ * @param fontSize 
+ * @returns 
+ */
+function createCheckBox(text: string, width: number, height: number, checkMarkSize: number, fontSize: number) {
+    const node = new Node();
+    node.addComponent(UITransform).setContentSize(width, height);
+    // node.addChild(createPanel(width, height, Color.BLUE, 6));
+    const toggle = node.addComponent(Toggle);
+
+    const toggleBg = createPanel(checkMarkSize, checkMarkSize, Color.WHITE, 6, 2, Color.BLACK);
+    node.addChild(toggleBg);
+    const toggleMark = createPanel(checkMarkSize - 4, checkMarkSize - 4, new Color("#005f96ff"), 6);
+    toggleBg.addChild(toggleMark);
+    toggleBg.setPosition(-width / 2 + checkMarkSize / 2 + 2, 0);
+    toggle.checkMark = toggleMark.addComponent(Sprite);
+
+    const label = createLabel("Label", fontSize, Color.WHITE, 2, Color.BLACK, v2(0, 0.5));
+    label.string = text;
+    node.addChild(label.node);
+    label.node.setPosition(-width / 2 + checkMarkSize + 8, 0);
+
+    return node;
+}
+
+function drawBorder(width: number, height: number, anchorPoint: Vec2) {
+    const node = new Node();
+    const uiTransform = node.addComponent(UITransform);
+    const graphics = node.addComponent(Graphics);
+    uiTransform.setContentSize(width, height);
+    graphics.rect(-width * anchorPoint.x, -height * anchorPoint.y, width, height);
+    graphics.strokeColor = Color.RED;
+    graphics.lineWidth = 2;
+    graphics.stroke();
+    return node;
 }
 
 interface IPanelStyleConfig {
@@ -1593,11 +1649,12 @@ const selectNodeQueue: Node[] = [];
 const curSelectedNodeQueue: Node[] = [];
 let curSelectedFirstItem: Node;
 
-function walkUINodeContect(node: Node, uiLocation: Vec2) {
+function walkUINodeContect(node: Node, uiLocation: Vec2): Node {
     // if(!node._uiProps?.uiTransformComp) return;
 
     for (let index = node.children.length - 1; index >= 0; index--) {
         const child = node.children[index];
+        if (child.name == "CreatorViewerPanelNode") continue;
         if (!child.activeInHierarchy) continue;
         if (!child._uiProps?.uiTransformComp) continue;
 
@@ -1613,13 +1670,18 @@ function walkUINodeContect(node: Node, uiLocation: Vec2) {
     }
 }
 
-function checkTouchNode(touchEvent: EventTouch) {
+function checkTouchNode(touchEvent: EventTouch, paintNode: Node) {
     curSelectedFirstItem = undefined;
     curSelectedNodeQueue.length = 0;
     const selectNode = walkUINodeContect(director.getScene(), touchEvent.getLocation());
     if (selectNode) {
         console.log(`selectNode`, selectNode);
         selectNodeQueue.push(selectNode);
+        const uiTransform = selectNode.getComponent(UITransform);
+        const border = drawBorder(uiTransform.width, uiTransform.height, uiTransform.anchorPoint);
+        paintNode.addChild(border);
+        border.setWorldPosition(selectNode.worldPosition);
+        creatorViewer.bridge.selectNodeByUuid(selectNode.uuid);
     }
     else {
         selectNodeQueue.length = 0;
@@ -1627,7 +1689,27 @@ function checkTouchNode(touchEvent: EventTouch) {
             console.log(`selectNode `, curSelectedFirstItem);
             selectNodeQueue.push(curSelectedFirstItem);
         }
+        else {
+            console.log(`selectNode none`);
+        }
     }
+}
+
+class TouchCheckContent extends Component {
+
+    protected onLoad(): void {
+        this.node.on(Node.EventType.TOUCH_START, this.onTouchStart, this);
+
+        this.node.on(Node.EventType.TOUCH_MOVE, this.onTouch, this);
+        this.node.on(Node.EventType.TOUCH_END, this.onTouch, this);
+        this.node.on(Node.EventType.TOUCH_CANCEL, this.onTouch, this);
+    }
+
+    protected onTouchStart(event: EventTouch) {
+        checkTouchNode(event, this.node);
+    }
+
+    protected onTouch(event: EventTouch) {}
 }
 
 
@@ -1641,6 +1723,8 @@ class CreatorViewerPanel extends Component {
     protected _cancelConnectButton: Button;
     protected _stateGraphics: Graphics;
 
+    protected _touchCheckNode: Node;
+
     protected onLoad(): void {
         this.node.name = "CreatorViewerPanel";
         const maskNode = createPanel(5000, 5000, new Color(123, 123, 123, 120), 0, 0);
@@ -1649,6 +1733,15 @@ class CreatorViewerPanel extends Component {
         maskNode.on(Button.EventType.CLICK, this.hidePanel, this);
         this.node.addChild(maskNode);
         this.createPanel(PanelDefaultStyle);
+    }
+
+    setTouchCheckNode(node: Node) {
+        this._touchCheckNode = node;
+        node.active = false;
+    }
+
+    protected onCheckNodeToggleChange(toggle: Toggle) {
+        this._touchCheckNode.active = toggle.isChecked;
     }
 
     protected hidePanel() {
@@ -1679,6 +1772,7 @@ class CreatorViewerPanel extends Component {
         }, 0.1);
     }
 
+    /** 创建面板控件 */
     protected createControls(style: IPanelStyleConfig) {
         const titleLabel = createLabel("TilteLabel", style.titleFontSize, Color.WHITE, 2, Color.BLACK, v2(0, 0.5));
         titleLabel.node.setPosition(-this._titleContent.getComponent(UITransform).width / 2 + 3, 0);
@@ -1727,6 +1821,11 @@ class CreatorViewerPanel extends Component {
         widget.top = 5;
 
         this._controlsContent.addChild(connectionLayout.node);
+
+        const checkbox = createCheckBox("选择模式", 120, 32, 20, 16);
+        checkbox.on(Toggle.EventType.TOGGLE, this.onCheckNodeToggleChange, this);
+        checkbox.getComponent(Toggle).isChecked = false;
+        this._controlsContent.addChild(checkbox);
     }
 
     protected changeState() {
@@ -1742,6 +1841,12 @@ class CreatorViewerPanel extends Component {
     }
 
     protected onClickCancel() {
+        creatorViewer.bridge.close();
+        this._connectButton.node.active = true;
+        this._cancelConnectButton.node.active = false;
+    }
+
+    protected onClickDisconnect() {
         creatorViewer.bridge.close();
         this._connectButton.node.active = true;
         this._cancelConnectButton.node.active = false;
@@ -1793,7 +1898,7 @@ if (!EDITOR) {
     /** 创建前端面板（用于连接和部分客户端开关用） */
     function createCreatorViewDebugLayer() {
         // 添加到场景中
-        const canvasNode = new Node();
+        const canvasNode = new Node("CreatorViewerPanelNode");
         creatorViewer.bridge = canvasNode.addComponent(ViewBridgeBase);
         const widget = canvasNode.addComponent(Widget);
         canvasNode.addComponent(Canvas);
@@ -1805,25 +1910,8 @@ if (!EDITOR) {
         const touchWidget = touchCheckNode.addComponent(Widget);
         touchWidget.isAlignBottom = touchWidget.isAlignTop = touchWidget.isAlignLeft = touchWidget.isAlignRight = true;
         touchWidget.bottom = touchWidget.top = touchWidget.left = touchWidget.right = 0;
-        // canvasNode.addChild(touchCheckNode);
-        touchCheckNode.on(Node.EventType.TOUCH_START, (event: EventTouch) => {
-            // event.preventSwallow = true;
-            checkTouchNode(event);
-        });
-
-        touchCheckNode.on(Node.EventType.TOUCH_MOVE, (event: EventTouch) => {
-            // event.preventSwallow = true;
-        });
-
-        touchCheckNode.on(Node.EventType.TOUCH_END, (event: EventTouch) => {
-            // event.preventSwallow = true;
-        });
-
-        touchCheckNode.on(Node.EventType.TOUCH_CANCEL, (event: EventTouch) => {
-            // event.preventSwallow = true;
-        });
-
-
+        canvasNode.addChild(touchCheckNode);
+        touchCheckNode.addComponent(TouchCheckContent);
 
         const floatingBar = new Node();
         floatingBar.addComponent(UITransform).setContentSize(100, 100);
@@ -1838,7 +1926,7 @@ if (!EDITOR) {
         })
 
         const panelNode = new Node();
-        panelNode.addComponent(CreatorViewerPanel);
+        panelNode.addComponent(CreatorViewerPanel).setTouchCheckNode(touchCheckNode);
         canvasNode.addChild(panelNode);
         panelNode.active = false;
     }

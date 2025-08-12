@@ -139,6 +139,8 @@ declare global {
         | { type: 'track_attrs'; data: ICCObjectPropGroup[] }
         /** 节点激活状态变化 */
         | { type: 'on_tracked_prop_change'; data: { targetUuid : string, propName : string, newValue : any }}
+        /** 节点被选中 */
+        | { type: 'on_node_selected_by_viewer'; data: { targetUuid : string }}
 
 
     type S2C_CreatorViewerMessage =
@@ -146,5 +148,6 @@ declare global {
         | { type: 'node_parent_or_sibling_index_change'; data: { nodeUuid: string, parentUuid: string, siblingIndex: number } }
         /** 选择某个节点 */
         | { type: 'select_node'; data: string }
-        | { type: 'on_tracker_prop_change', data: { targetUuid: string, propName: string, value: any } };
+        | { type: 'on_tracker_prop_change', data: { targetUuid: string, propName: string, value: any } }
+        | { type: 'print_target_by_uuid', data: { targetUuid: string } };
 }
