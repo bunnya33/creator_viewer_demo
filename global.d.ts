@@ -1,6 +1,8 @@
 import { v2 } from "cc";
 import { CreatorViewerDatas } from "./assets/CreatorViewer";
 declare global {
+
+    type NodeType = "node" | "canvas" | "camera" | "sprite" | "particle2D" | "skeleton2D" | "label" | "button" | "graphics" | "scene" | "scroll_view" | "edit_box";
     /** 节点信息结构 */
     interface INodeInfo {
         /** 节点名称 */
@@ -19,6 +21,8 @@ declare global {
         parentActive?: boolean;
         /** 父节点Uuid */
         parentUuid?: string;
+        /** 节点类型 */
+        type : NodeType;
     }
 
     /** 枚举类型的单项 */

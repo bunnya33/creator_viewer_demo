@@ -1,4 +1,4 @@
-import { _decorator, Asset, BlockInputEvents, Button, Canvas, CCObject, Color, Component, Director, director, EditBox, EventTouch, gfx, Graphics, HorizontalTextAlignment, isValid, js, Label, Layout, Node, Overflow, Rect, Scene, size, Size, Sprite, sys, Toggle, tween, Tween, UIOpacity, UIRenderer, UITransform, v2, v3, ValueType, Vec2, Vec3, Vec4, Widget } from 'cc';
+import { _decorator, Asset, BlockInputEvents, Button, Camera, Canvas, CCObject, Color, Component, Director, director, EditBox, EventTouch, gfx, Graphics, HorizontalTextAlignment, isValid, js, Label, Layout, Node, Overflow, ParticleSystem, ParticleSystem2D, Rect, Scene, size, Size, sp, Sprite, sys, Toggle, tween, Tween, UIOpacity, UIRenderer, UITransform, v2, v3, ValueType, Vec2, Vec3, Vec4, Widget } from 'cc';
 import { EDITOR } from 'cc/env';
 
 const { ccclass, property, requireComponent } = _decorator;
@@ -985,6 +985,8 @@ class NodeInfo {
     // activeInHierarchy : boolean = false;
     active: boolean = false;
 
+    type : NodeType = "node";
+
     @NonEnumerable()
     childrenUUidMap: Map<string, NodeInfo> = new Map();
 
@@ -1141,6 +1143,26 @@ class NodeInfo {
     }
 }
 
+type ComponentType = new ()=>Component;
+
+const NodeTypesCheckQueue : { type : NodeType, comp : ComponentType}[] = [
+    {comp : Canvas, type : "canvas"},
+    {comp : Camera, type : "camera"},
+    {comp : ParticleSystem2D, type : "particle2D"},
+    {comp : sp.Skeleton, type : "skeleton2D"},
+    {comp : EditBox, type : "edit_box"},
+    {comp : Label, type : "label"},
+    {comp : Sprite, type : "sprite"},
+];
+
+function getNodeType(node : Node) : NodeType {
+    for(const check of NodeTypesCheckQueue) {
+        if(node.getComponent(check.comp)) return check.type;
+    }
+
+    return "node";
+}
+
 /**
  * 遍历节点并生成节点信息
  * @param node 节点或场景
@@ -1157,6 +1179,7 @@ function walkNode(node: Node | Scene, parent?: NodeInfo) {
     nodeInfo.uuid = node.uuid;
     nodeInfo.parent = parent;
     nodeInfo.active = node.active;
+    nodeInfo.type = getNodeType(node);
     node.children.forEach(child => nodeInfo.addChildNodeInfo(walkNode(child, nodeInfo)));
     return nodeInfo;
 }
