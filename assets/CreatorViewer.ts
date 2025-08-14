@@ -1,4 +1,4 @@
-import { _decorator, Asset, BlockInputEvents, Button, Camera, Canvas, CCObject, Color, Component, Director, director, EditBox, EventTouch, gfx, Graphics, HorizontalTextAlignment, isValid, js, Label, Layout, Node, Overflow, ParticleSystem, ParticleSystem2D, Rect, Scene, size, Size, sp, Sprite, sys, Toggle, tween, Tween, UIOpacity, UIRenderer, UITransform, v2, v3, ValueType, Vec2, Vec3, Vec4, Widget } from 'cc';
+import { _decorator, Asset, BlockInputEvents, Button, Camera, Canvas, CCObject, Color, Component, Director, director, EditBox, EventTouch, gfx, Graphics, HorizontalTextAlignment, isValid, js, Label, Layout, Mask, Node, Overflow, ParticleSystem, ParticleSystem2D, Rect, Scene, size, Size, sp, Sprite, sys, Toggle, ToggleContainer, tween, Tween, UIOpacity, UIRenderer, UITransform, v2, v3, ValueType, Vec2, Vec3, Vec4, Widget } from 'cc';
 import { EDITOR } from 'cc/env';
 
 const { ccclass, property, requireComponent } = _decorator;
@@ -1148,8 +1148,11 @@ type ComponentType = new ()=>Component;
 const NodeTypesCheckQueue : { type : NodeType, comp : ComponentType}[] = [
     {comp : Canvas, type : "canvas"},
     {comp : Camera, type : "camera"},
+    {comp : Mask, type: "mask"},
     {comp : ParticleSystem2D, type : "particle2D"},
     {comp : sp.Skeleton, type : "skeleton2D"},
+    {comp : Toggle, type : "toggle"},
+    {comp : ToggleContainer, type : "toggle_group"},
     {comp : EditBox, type : "edit_box"},
     {comp : Label, type : "label"},
     {comp : Sprite, type : "sprite"},
