@@ -1,4 +1,4 @@
-import { _decorator, Asset, BlockInputEvents, Button, Camera, Canvas, CCObject, Color, Component, Director, director, EditBox, EventTouch, gfx, Graphics, HorizontalTextAlignment, isValid, js, Label, Layout, Mask, Node, Overflow, ParticleSystem, ParticleSystem2D, Rect, Scene, size, Size, sp, Sprite, sys, Toggle, ToggleContainer, tween, Tween, UIOpacity, UIRenderer, UITransform, v2, v3, ValueType, Vec2, Vec3, Vec4, Widget } from 'cc';
+import { _decorator, Asset, BlockInputEvents, Button, Camera, Canvas, CCObject, Color, Component, Director, director, EditBox, EventTouch, gfx, Graphics, HorizontalTextAlignment, isValid, js, Label, Layout, Mask, Node, Overflow, PageView, ParticleSystem, ParticleSystem2D, ProgressBar, Rect, RichText, Scene, ScrollView, size, Size, Slider, sp, Sprite, sys, TiledMap, Toggle, ToggleContainer, tween, Tween, UIOpacity, UIRenderer, UITransform, v2, v3, ValueType, Vec2, Vec3, Vec4, VideoPlayer, WebView, Widget } from 'cc';
 import { EDITOR } from 'cc/env';
 
 const { ccclass, property, requireComponent } = _decorator;
@@ -1148,18 +1148,35 @@ type ComponentType = new ()=>Component;
 const NodeTypesCheckQueue : { type : NodeType, comp : ComponentType}[] = [
     {comp : Canvas, type : "canvas"},
     {comp : Camera, type : "camera"},
+    {comp : TiledMap, type : "tiled_map"},
+    {comp : PageView, type : "page_view"},
+    {comp : VideoPlayer, type : "video_player"},
+    {comp : WebView, type : "webview"},
+    {comp : ScrollView, type : "scroll_view"},
     {comp : Mask, type: "mask"},
+    {comp : Graphics, type : "graphics"},
     {comp : ParticleSystem2D, type : "particle2D"},
+    {comp : ParticleSystem, type : "particle2D"},
     {comp : sp.Skeleton, type : "skeleton2D"},
+    {comp : Slider, type : "slider"},
     {comp : Toggle, type : "toggle"},
     {comp : ToggleContainer, type : "toggle_group"},
+    {comp : Layout, type : "layout"},
     {comp : EditBox, type : "edit_box"},
+    {comp : RichText, type : "rich_edit"},
+    {comp : Button, type : "button"},
     {comp : Label, type : "label"},
+    {comp : ProgressBar, type : "progress_bar"},
     {comp : Sprite, type : "sprite"},
+    {comp : Widget, type : "widget"},
+    {comp : UITransform, type : "transform"}
 ];
 
 function getNodeType(node : Node) : NodeType {
+    if(node instanceof Scene) return 'scene';
+
     for(const check of NodeTypesCheckQueue) {
+        if(!check.comp) continue;
         if(node.getComponent(check.comp)) return check.type;
     }
 

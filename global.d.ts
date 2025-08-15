@@ -1,6 +1,7 @@
 import { CreatorViewerDatas } from "./assets/CreatorViewer";
 declare global {
-    type NodeType = "node" | "canvas" | "camera" | "sprite" | "particle2D" | "skeleton2D" | "label" | "button" | "graphics" | "scene" | "scroll_view" | "edit_box" | "toggle" | "toggle_group" | "mask";
+    type NodeType = "node" | "canvas" | "camera" | "sprite" | "particle2D" | "skeleton2D" | "label" | "button" | "graphics" | "scene" | "scroll_view" | "edit_box" | "toggle" | "toggle_group" | "mask" | "transform" | "slider" | "tiled_map" | "widget" | "webview" | "video_player" | "page_view" | "rich_edit" | "layout" | "progress_bar";
+    
     /** 节点信息结构 */
     interface INodeInfo {
         /** 节点名称 */
