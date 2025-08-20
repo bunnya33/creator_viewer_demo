@@ -470,14 +470,14 @@ class ViewElementTracker {
 
     protected _uuid: string = '';
 
-    protected _type: 'node' | 'component' = 'node';
+    protected _type: NodeType = 'node';
 
     protected _name: string = "";
 
     constructor(elementTarget: Node | Component) {
         this._target = elementTarget;
         this._uuid = elementTarget.uuid;
-        this._type = elementTarget instanceof Node ? "node" : "component";
+        this._type = getTargetType(elementTarget);
         if (elementTarget instanceof Node) {
             this._name = elementTarget.name;
         }
@@ -1009,7 +1009,6 @@ class NodeInfo {
         node.on(Node.EventType.CHILDREN_ORDER_CHANGED, this.onChildrenOrderChange, this);
         node.on(Node.EventType.COMPONENT_ADDED, this.onComponentAdd, this);
         node.on(Node.EventType.NODE_DESTROYED, this.onNodeDestroyed, this);
-        node.on(Node.EventType.ACTIVE_CHANGED, this.onActiveChanged, this);
         creatorViewer.allNodeInfosMap.set(node.uuid, this);
         creatorViewer.allNodesMap.set(node.uuid, node);
     }
@@ -1022,12 +1021,6 @@ class NodeInfo {
 
     protected onComponentAdd(component: Component) {
 
-    }
-
-    protected onActiveChanged(node: Node) {
-        if (node.active == this.active) return;
-        this.active = node.active;
-        creatorViewer.bridge.onNodeActiveChanged(this.uuid, node.active);
     }
 
     protected onNodeDestroyed() {
@@ -1093,6 +1086,12 @@ class NodeInfo {
     onNodeNameChange(newName: string) {
         const oldName = this.name;
         this.name = newName;
+    }
+
+    onNodeActiveChange(value : boolean) {
+        if (value == this.active) return;
+        this.active = value;
+        creatorViewer.bridge.onNodeActiveChanged(this.uuid, value);
     }
 
     setNodePosition(x: number, y: number, z?: number) {
@@ -1178,6 +1177,17 @@ function getNodeType(node : Node) : NodeType {
     for(const check of NodeTypesCheckQueue) {
         if(!check.comp) continue;
         if(node.getComponent(check.comp)) return check.type;
+    }
+
+    return "node";
+}
+
+function getTargetType(target : Node | Component) : NodeType {
+    if(target instanceof Scene) return 'scene';
+
+    for(const check of NodeTypesCheckQueue) {
+        if(!check.comp) continue;
+        if(target instanceof check.comp) return check.type;
     }
 
     return "node";
@@ -1918,6 +1928,24 @@ if (!EDITOR) {
                 enumerable: true,
             });
         }
+
+        Reflect.defineProperty(Node.prototype, '_activePatchedValue', { value : true, configurable : true, writable : true });
+
+        Reflect.defineProperty(Node.prototype, '_active', { 
+            set(value: boolean) {
+                const uuid = this.uuid;
+                if (creatorViewer.allNodeInfosMap.has(uuid)) {
+                    const nodeInfo = creatorViewer.allNodeInfosMap.get(uuid);
+                    nodeInfo.onNodeActiveChange(value);
+                }
+                this._activePatchedValue = value;
+            },
+            get() {
+                return this._activePatchedValue;
+            }, // 保持 getter 不变
+            configurable: true,
+            enumerable: false,
+        });
     }
 
     patchNode();
