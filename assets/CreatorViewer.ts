@@ -9,8 +9,24 @@ let srcLogFunc = srclog;
 export class Logger {
     static logEnable = false;
     static logSwitch() {
-        this.logEnable = !this.logEnable;
-        srcLogFunc = this.logEnable ? srclog : () => { };
+        // this.logEnable = !this.logEnable;
+        // srcLogFunc = this.logEnable ? srclog : () => { };
+
+    }
+
+    static printStorage() {
+        let storages: Record<string, any> = {};
+        for (let i = 0; i < sys.localStorage.length; i++) {
+            let key = sys.localStorage.key(i);
+            let value = sys.localStorage.getItem(key);
+            try {
+                value = JSON.parse(value);
+            } catch (error) {
+
+            }
+            storages[key] = value;
+        }
+        console.log(storages);
     }
 
     static get log() {
@@ -167,6 +183,24 @@ export class ViewBridgeBase extends Component {
                     }
                 }
                     break;
+                case 'pull_client_storage': {
+                    let storages: { key : string, value : any}[] = [];
+                    for (let i = 0; i < sys.localStorage.length; i++) {
+                        let key = sys.localStorage.key(i);
+                        let value = sys.localStorage.getItem(key);
+                        try {
+                            value = JSON.parse(value);
+                        } catch (error) {
+
+                        }
+                        storages.push({
+                            key : key,
+                            value : value
+                        })
+                    }
+                    this.sendData({ type: 'on_client_storage_datas', data: storages })
+                }
+                    break;
             }
         } catch (error) {
             console.error(error);
@@ -217,8 +251,8 @@ export class ViewBridgeBase extends Component {
         this.sendData({ type: 'on_tracked_prop_change', data: { targetUuid: targetUuid, propName: propName, newValue: newValue } });
     }
 
-    selectNodeByUuid(targetUuid : string) {
-        this.sendData({ type: 'on_node_selected_by_viewer', data: { targetUuid: targetUuid}});
+    selectNodeByUuid(targetUuid: string) {
+        this.sendData({ type: 'on_node_selected_by_viewer', data: { targetUuid: targetUuid } });
     }
 }
 
@@ -985,7 +1019,7 @@ class NodeInfo {
     // activeInHierarchy : boolean = false;
     active: boolean = false;
 
-    type : NodeType = "node";
+    type: NodeType = "node";
 
     @NonEnumerable()
     childrenUUidMap: Map<string, NodeInfo> = new Map();
@@ -1088,7 +1122,7 @@ class NodeInfo {
         this.name = newName;
     }
 
-    onNodeActiveChange(value : boolean) {
+    onNodeActiveChange(value: boolean) {
         if (value == this.active) return;
         this.active = value;
         creatorViewer.bridge.onNodeActiveChanged(this.uuid, value);
@@ -1142,52 +1176,55 @@ class NodeInfo {
     }
 }
 
-type ComponentType = new ()=>Component;
+type ComponentType = new () => Component;
 
-const NodeTypesCheckQueue : { type : NodeType, comp : ComponentType}[] = [
-    {comp : Canvas, type : "canvas"},
-    {comp : Camera, type : "camera"},
-    {comp : TiledMap, type : "tiled_map"},
-    {comp : PageView, type : "page_view"},
-    {comp : VideoPlayer, type : "video_player"},
-    {comp : WebView, type : "webview"},
-    {comp : ScrollView, type : "scroll_view"},
-    {comp : Mask, type: "mask"},
-    {comp : Graphics, type : "graphics"},
-    {comp : ParticleSystem2D, type : "particle2D"},
-    {comp : ParticleSystem, type : "particle2D"},
-    {comp : sp.Skeleton, type : "skeleton2D"},
-    {comp : Slider, type : "slider"},
-    {comp : Toggle, type : "toggle"},
-    {comp : ToggleContainer, type : "toggle_group"},
-    {comp : Layout, type : "layout"},
-    {comp : EditBox, type : "edit_box"},
-    {comp : RichText, type : "rich_edit"},
-    {comp : Button, type : "button"},
-    {comp : Label, type : "label"},
-    {comp : ProgressBar, type : "progress_bar"},
-    {comp : Sprite, type : "sprite"},
-    {comp : Widget, type : "widget"},
-    {comp : UITransform, type : "transform"}
+const NodeTypesCheckQueue: { type: NodeType, comp: ComponentType }[] = [
+    { comp: Canvas, type: "canvas" },
+    { comp: Camera, type: "camera" },
+    { comp: TiledMap, type: "tiled_map" },
+    { comp: PageView, type: "page_view" },
+    { comp: VideoPlayer, type: "video_player" },
+    { comp: WebView, type: "webview" },
+    { comp: ScrollView, type: "scroll_view" },
+    { comp: Mask, type: "mask" },
+    { comp: Graphics, type: "graphics" },
+    { comp: ParticleSystem2D, type: "particle2D" },
+    { comp: ParticleSystem, type: "particle2D" },
+    { comp: sp.Skeleton, type: "skeleton2D" },
+    { comp: Slider, type: "slider" },
+    { comp: Toggle, type: "toggle" },
+    { comp: ToggleContainer, type: "toggle_group" },
+    { comp: Layout, type: "layout" },
+    { comp: EditBox, type: "edit_box" },
+    { comp: RichText, type: "rich_edit" },
+    { comp: Button, type: "button" },
+    { comp: Label, type: "label" },
+    { comp: ProgressBar, type: "progress_bar" },
+    { comp: Sprite, type: "sprite" },
+    { comp: Widget, type: "widget" },
+    { comp: UITransform, type: "transform" }
 ];
 
-function getNodeType(node : Node) : NodeType {
-    if(node instanceof Scene) return 'scene';
+function getNodeType(node: Node): NodeType {
+    if (node instanceof Scene) return 'scene';
 
-    for(const check of NodeTypesCheckQueue) {
-        if(!check.comp) continue;
-        if(node.getComponent(check.comp)) return check.type;
+    for (const check of NodeTypesCheckQueue) {
+        if (!check.comp) continue;
+        if (node.getComponent(check.comp)) return check.type;
     }
 
     return "node";
 }
 
-function getTargetType(target : Node | Component) : NodeType {
-    if(target instanceof Scene) return 'scene';
+function getTargetType(target: Node | Component): NodeType {
+    if (target instanceof Scene) return 'scene';
 
-    for(const check of NodeTypesCheckQueue) {
-        if(!check.comp) continue;
-        if(target instanceof check.comp) return check.type;
+    if (target instanceof Component) {
+        for (const check of NodeTypesCheckQueue) {
+            if (!check.comp) continue;
+            if (target instanceof check.comp) return check.type;
+        }
+        return "component";
     }
 
     return "node";
@@ -1762,7 +1799,7 @@ class TouchCheckContent extends Component {
         checkTouchNode(event, this.node);
     }
 
-    protected onTouch(event: EventTouch) {}
+    protected onTouch(event: EventTouch) { }
 }
 
 
@@ -1929,9 +1966,9 @@ if (!EDITOR) {
             });
         }
 
-        Reflect.defineProperty(Node.prototype, '_activePatchedValue', { value : true, configurable : true, writable : true });
+        Reflect.defineProperty(Node.prototype, '_activePatchedValue', { value: true, configurable: true, writable: true });
 
-        Reflect.defineProperty(Node.prototype, '_active', { 
+        Reflect.defineProperty(Node.prototype, '_active', {
             set(value: boolean) {
                 const uuid = this.uuid;
                 if (creatorViewer.allNodeInfosMap.has(uuid)) {

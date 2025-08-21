@@ -1,6 +1,6 @@
 import { CreatorViewerDatas } from "./assets/CreatorViewer";
 declare global {
-    type NodeType = "node" | "canvas" | "camera" | "sprite" | "particle2D" | "skeleton2D" | "label" | "button" | "graphics" | "scene" | "scroll_view" | "edit_box" | "toggle" | "toggle_group" | "mask" | "transform" | "slider" | "tiled_map" | "widget" | "webview" | "video_player" | "page_view" | "rich_edit" | "layout" | "progress_bar";
+    type NodeType = "node" | "canvas" | "camera" | "sprite" | "particle2D" | "skeleton2D" | "label" | "button" | "graphics" | "scene" | "scroll_view" | "edit_box" | "toggle" | "toggle_group" | "mask" | "transform" | "slider" | "tiled_map" | "widget" | "webview" | "video_player" | "page_view" | "rich_edit"  | "layout" | "progress_bar" | "component";
     
     /** 节点信息结构 */
     interface INodeInfo {
@@ -144,7 +144,8 @@ declare global {
         | { type: 'on_tracked_prop_change'; data: { targetUuid : string, propName : string, newValue : any }}
         /** 节点被选中 */
         | { type: 'on_node_selected_by_viewer'; data: { targetUuid : string }}
-
+        /** 客户端存储数据 */
+        | { type: 'on_client_storage_datas'; data : any[] }
 
     type S2C_CreatorViewerMessage =
         { type: 'change_node_active'; data: { nodeUuid: string, active: boolean } }
@@ -152,5 +153,6 @@ declare global {
         /** 选择某个节点 */
         | { type: 'select_node'; data: string }
         | { type: 'on_tracker_prop_change', data: { targetUuid: string, propName: string, value: any } }
-        | { type: 'print_target_by_uuid', data: { targetUuid: string } };
+        | { type: 'print_target_by_uuid', data: { targetUuid: string } }
+        | { type: 'pull_client_storage', data: {} };
 }
